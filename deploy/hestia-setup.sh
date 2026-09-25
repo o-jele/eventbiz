@@ -37,20 +37,21 @@ else
   exit 1
 fi
 
-if ! "$BIN/v-list-users" | grep -q "^$USER:"; then
+if ! "$BIN/v-list-user" "$USER" >/dev/null 2>&1; then
   echo "-> Creating Hestia user $USER (you will set its password in the panel)"
   "$BIN/v-add-user" "$USER" "$(openssl rand -base64 18)" "info@$DOMAIN" default
 fi
-if ! "$BIN/v-list-web-domains" "$USER" 2>/dev/null | grep -q "$DOMAIN"; then
+if ! "$BIN/v-list-web-domain" "$USER" "$DOMAIN" >/dev/null 2>&1; then
   echo "-> Adding web domain $DOMAIN"
   "$BIN/v-add-web-domain" "$USER" "$DOMAIN"
 fi
-if ! "$BIN/v-list-databases" "$USER" 2>/dev/null | grep -q "$DB"; then
+if ! "$BIN/v-list-databases" "$USER" 2>/dev/null | awk '{print $1}' | grep -qx "$DB"; then
   echo "-> Creating database $DB"
   "$BIN/v-add-database" "$USER" "$DB" "$DBUSER" "$DBPASS" mysql
 fi
 echo "-> Setting PHP $PHPV backend template"
-"$BIN/v-change-web-domain-tpl" "$USER" "$DOMAIN" "default" "PHP-$PHPV" 2>/dev/null || true
+"$BIN/v-change-web-domain-backend-tpl" "$USER" "$DOMAIN" "PHP-${PHPV//./_}" 2>/dev/null || \
+  echo "   (could not set backend template automatically — set PHP $PHPV in panel: Web → $DOMAIN → Backend Template)"
 
 WEBROOT="/home/$USER/web/$DOMAIN/public_html"
 [[ -n "$SRC" && -f "$SRC" ]] && {
