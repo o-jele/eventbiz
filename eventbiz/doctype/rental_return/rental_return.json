@@ -1,0 +1,93 @@
+{
+  "doctype": "DocType",
+  "name": "Rental Return",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 0,
+  "issubmittable": 1,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "rental_booking",
+    "company",
+    "customer",
+    "return_date_actual",
+    "items",
+    "damage_charges",
+    "missing_charges",
+    "refund_due",
+    "status"
+  ],
+  "fields": [
+    {
+      "fieldname": "rental_booking",
+      "label": "Rental Booking",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Rental Booking"
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "customer",
+      "label": "Customer",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Customer"
+    },
+    {
+      "fieldname": "return_date_actual",
+      "label": "Actual Return",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "items",
+      "label": "Items",
+      "fieldtype": "Table",
+      "reqd": 1,
+      "options": "Rental Return Item"
+    },
+    {
+      "fieldname": "damage_charges",
+      "label": "Damage Charges",
+      "fieldtype": "Currency",
+      "reqd": 0
+    },
+    {
+      "fieldname": "missing_charges",
+      "label": "Missing Charges",
+      "fieldtype": "Currency",
+      "reqd": 0
+    },
+    {
+      "fieldname": "refund_due",
+      "label": "Refund Due",
+      "fieldtype": "Currency",
+      "reqd": 0
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Draft\nInspected\nSettled\nCompleted"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ]
+}

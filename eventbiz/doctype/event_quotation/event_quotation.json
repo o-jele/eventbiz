@@ -1,0 +1,86 @@
+{
+  "doctype": "DocType",
+  "name": "Event Quotation",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 0,
+  "issubmittable": 1,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "company",
+    "customer",
+    "event",
+    "services",
+    "grand_total",
+    "deposit_required",
+    "valid_until",
+    "status"
+  ],
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "customer",
+      "label": "Customer",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Customer"
+    },
+    {
+      "fieldname": "event",
+      "label": "Event",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Glamorous Event"
+    },
+    {
+      "fieldname": "services",
+      "label": "Services",
+      "fieldtype": "Table",
+      "reqd": 1,
+      "options": "Event Quotation Service"
+    },
+    {
+      "fieldname": "grand_total",
+      "label": "Grand Total",
+      "fieldtype": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "deposit_required",
+      "label": "Deposit Required",
+      "fieldtype": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "valid_until",
+      "label": "Valid Until",
+      "fieldtype": "Date",
+      "reqd": 0
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Draft\nSent\nApproved\nRejected\nConverted\nExpired"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ]
+}

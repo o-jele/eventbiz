@@ -1,0 +1,108 @@
+{
+  "doctype": "DocType",
+  "name": "Rental Booking",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 0,
+  "issubmittable": 1,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "company",
+    "customer",
+    "event",
+    "event_date",
+    "return_date_expected",
+    "fulfilment_method",
+    "rental_items",
+    "grand_total",
+    "deposit_required",
+    "deposit_received",
+    "status"
+  ],
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "customer",
+      "label": "Customer",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Customer"
+    },
+    {
+      "fieldname": "event",
+      "label": "Event",
+      "fieldtype": "Link",
+      "reqd": 0,
+      "options": "Glamorous Event"
+    },
+    {
+      "fieldname": "event_date",
+      "label": "Event Date",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "return_date_expected",
+      "label": "Expected Return",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "fulfilment_method",
+      "label": "Fulfilment",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Customer Pickup\nDelivery"
+    },
+    {
+      "fieldname": "rental_items",
+      "label": "Items",
+      "fieldtype": "Table",
+      "reqd": 1,
+      "options": "Rental Booking Item"
+    },
+    {
+      "fieldname": "grand_total",
+      "label": "Total",
+      "fieldtype": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "deposit_required",
+      "label": "Deposit Required",
+      "fieldtype": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "deposit_received",
+      "label": "Deposit Received",
+      "fieldtype": "Currency",
+      "reqd": 0
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Draft\nQuoted\nDeposit Pending\nConfirmed\nDispatched\nAt Customer\nReturn Due\nReturned\nCompleted\nCancelled"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ]
+}

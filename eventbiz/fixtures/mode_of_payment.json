@@ -1,0 +1,6 @@
+[
+  {"doctype": "Mode of Payment", "mode_of_payment": "Cash", "type": "Cash"},
+  {"doctype": "Mode of Payment", "mode_of_payment": "Bank Transfer", "type": "Bank"},
+  {"doctype": "Mode of Payment", "mode_of_payment": "Mobile Money", "type": "Cash"},
+  {"doctype": "Mode of Payment", "mode_of_payment": "Other Manual", "type": "Cash"}
+]

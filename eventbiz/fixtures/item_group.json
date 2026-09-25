@@ -1,0 +1,20 @@
+[
+  {"doctype": "Item Group", "item_group_name": "Creations", "is_group": 1},
+  {"doctype": "Item Group", "item_group_name": "Baking Ingredients", "parent_item_group": "Creations"},
+  {"doctype": "Item Group", "item_group_name": "Baking Tools & Equipment", "parent_item_group": "Creations"},
+  {"doctype": "Item Group", "item_group_name": "Packaging", "parent_item_group": "Creations"},
+  {"doctype": "Item Group", "item_group_name": "Delights - Bakery", "is_group": 1},
+  {"doctype": "Item Group", "item_group_name": "Cakes", "parent_item_group": "Delights - Bakery"},
+  {"doctype": "Item Group", "item_group_name": "Fritters & Snacks", "parent_item_group": "Delights - Bakery"},
+  {"doctype": "Item Group", "item_group_name": "Bakery Ingredients", "parent_item_group": "Delights - Bakery"},
+  {"doctype": "Item Group", "item_group_name": "Delights - Catering", "is_group": 1},
+  {"doctype": "Item Group", "item_group_name": "Catering Menus", "parent_item_group": "Delights - Catering"},
+  {"doctype": "Item Group", "item_group_name": "Catering Services", "parent_item_group": "Delights - Catering"},
+  {"doctype": "Item Group", "item_group_name": "Delights - Rental", "is_group": 1},
+  {"doctype": "Item Group", "item_group_name": "Furniture", "parent_item_group": "Delights - Rental"},
+  {"doctype": "Item Group", "item_group_name": "Cookware & Serving", "parent_item_group": "Delights - Rental"},
+  {"doctype": "Item Group", "item_group_name": "Tents & Decor", "parent_item_group": "Delights - Rental"},
+  {"doctype": "Item Group", "item_group_name": "Services", "is_group": 1},
+  {"doctype": "Item Group", "item_group_name": "Delivery & Setup", "parent_item_group": "Services"},
+  {"doctype": "Item Group", "item_group_name": "Event Staffing", "parent_item_group": "Services"}
+]

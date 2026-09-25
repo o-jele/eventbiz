@@ -1,0 +1,11 @@
+<h2>Rental Booking {{ doc.name }}</h2>
+<p>{{ doc.customer }} · Event: {{ doc.event_date }} · Return: {{ doc.return_date_expected }}</p>
+<table>
+  <thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
+  <tbody>
+    {% for r in doc.rental_items %}
+    <tr><td>{{ r.item }}</td><td>{{ r.qty_requested }}</td><td>{{ r.rate }}</td><td>{{ r.amount }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><strong>Total: {{ doc.grand_total }}</strong> · Deposit: {{ doc.deposit_required }}</p>

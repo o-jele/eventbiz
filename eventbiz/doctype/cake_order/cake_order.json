@@ -1,0 +1,124 @@
+{
+  "doctype": "DocType",
+  "name": "Cake Order",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 0,
+  "issubmittable": 1,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "company",
+    "customer",
+    "event",
+    "order_type",
+    "product",
+    "quantity",
+    "required_date",
+    "customization",
+    "reference_image",
+    "price",
+    "fulfilment_method",
+    "production_status",
+    "status"
+  ],
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "customer",
+      "label": "Customer",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Customer"
+    },
+    {
+      "fieldname": "event",
+      "label": "Event",
+      "fieldtype": "Link",
+      "reqd": 0,
+      "options": "Glamorous Event"
+    },
+    {
+      "fieldname": "order_type",
+      "label": "Type",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Cake\nFritters\nOther Bakery"
+    },
+    {
+      "fieldname": "product",
+      "label": "Base Product",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Item"
+    },
+    {
+      "fieldname": "quantity",
+      "label": "Qty",
+      "fieldtype": "Float",
+      "reqd": 1
+    },
+    {
+      "fieldname": "required_date",
+      "label": "Required Date",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "customization",
+      "label": "Customization",
+      "fieldtype": "Text",
+      "reqd": 0
+    },
+    {
+      "fieldname": "reference_image",
+      "label": "Reference Image",
+      "fieldtype": "Attach Image",
+      "reqd": 0
+    },
+    {
+      "fieldname": "price",
+      "label": "Agreed Price",
+      "fieldtype": "Currency",
+      "reqd": 0
+    },
+    {
+      "fieldname": "fulfilment_method",
+      "label": "Fulfilment",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Customer Pickup\nDelivery"
+    },
+    {
+      "fieldname": "production_status",
+      "label": "Production Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Pending\nScheduled\nIn Production\nReady\nDelivered\nCancelled"
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Draft\nAwaiting Quotation\nQuoted\nConfirmed\nIn Production\nReady\nDelivered\nInvoiced\nCompleted\nCancelled"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ]
+}

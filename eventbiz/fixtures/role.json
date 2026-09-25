@@ -1,0 +1,6 @@
+[
+  {"doctype": "Role", "role_name": "Creations Staff", "desk_access": 1},
+  {"doctype": "Role", "role_name": "Delights Sales", "desk_access": 1},
+  {"doctype": "Role", "role_name": "Delights Operations", "desk_access": 1},
+  {"doctype": "Role", "role_name": "Accounts Manager", "desk_access": 1}
+]

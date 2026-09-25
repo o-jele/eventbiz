@@ -1,0 +1,107 @@
+{
+  "doctype": "DocType",
+  "name": "Customer Enquiry",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 0,
+  "issubmittable": 0,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "company_context",
+    "enquiry_type",
+    "name1",
+    "phone",
+    "email",
+    "subject",
+    "message",
+    "event_date",
+    "source",
+    "status",
+    "assigned_to"
+  ],
+  "fields": [
+    {
+      "fieldname": "company_context",
+      "label": "Company",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "enquiry_type",
+      "label": "Type",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "General\nWedding\nCatering\nRental\nCake\nProduct"
+    },
+    {
+      "fieldname": "name1",
+      "label": "Name",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "phone",
+      "label": "Phone",
+      "fieldtype": "Data",
+      "reqd": 0
+    },
+    {
+      "fieldname": "email",
+      "label": "Email",
+      "fieldtype": "Data",
+      "reqd": 0
+    },
+    {
+      "fieldname": "subject",
+      "label": "Subject",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "message",
+      "label": "Message",
+      "fieldtype": "Text",
+      "reqd": 1
+    },
+    {
+      "fieldname": "event_date",
+      "label": "Event Date",
+      "fieldtype": "Date",
+      "reqd": 0
+    },
+    {
+      "fieldname": "source",
+      "label": "Source",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Website\nWalk-in\nPhone\nWhatsApp\nReferral"
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Open\nAssigned\nQuoted\nConverted\nClosed\nSpam"
+    },
+    {
+      "fieldname": "assigned_to",
+      "label": "Assigned To",
+      "fieldtype": "Link",
+      "reqd": 0,
+      "options": "User"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ]
+}

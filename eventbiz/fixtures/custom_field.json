@@ -1,0 +1,62 @@
+[
+  {
+    "doctype": "Custom Field",
+    "dt": "Item",
+    "fieldname": "custom_business_unit",
+    "label": "Business Unit",
+    "fieldtype": "Select",
+    "options": "Creations\nDelights\nShared",
+    "insert_after": "item_group"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Item",
+    "fieldname": "custom_featured",
+    "label": "Featured on Website",
+    "fieldtype": "Check",
+    "insert_after": "custom_business_unit"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Item",
+    "fieldname": "custom_replacement_rate",
+    "label": "Replacement Rate (missing-item charge)",
+    "fieldtype": "Currency",
+    "insert_after": "custom_featured"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Customer",
+    "fieldname": "custom_primary_phone",
+    "label": "Primary Phone",
+    "fieldtype": "Data",
+    "reqd": 1,
+    "insert_after": "mobile_no"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Customer",
+    "fieldname": "custom_whatsapp",
+    "label": "WhatsApp",
+    "fieldtype": "Data",
+    "insert_after": "custom_primary_phone"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Sales Order",
+    "fieldname": "custom_fulfilment_method",
+    "label": "Fulfilment Method",
+    "fieldtype": "Select",
+    "options": "Customer Pickup\nDelivery",
+    "insert_after": "delivery_date"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Sales Order",
+    "fieldname": "custom_delivery_status",
+    "label": "Delivery Status",
+    "fieldtype": "Select",
+    "options": "Not Required\nPending Arrangement\nArranged\nOut for Delivery\nDelivered",
+    "insert_after": "custom_fulfilment_method"
+  }
+]

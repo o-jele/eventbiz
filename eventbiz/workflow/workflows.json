@@ -1,0 +1,71 @@
+[
+  {
+    "doctype": "Workflow",
+    "workflow_name": "Customer Payment Verification",
+    "document_type": "Customer Payment Declaration",
+    "is_active": 1,
+    "states": [
+      {"state": "Submitted", "doc_status": 0, "allow_edit": "Customer"},
+      {"state": "Pending Verification", "doc_status": 1, "allow_edit": "Accounts Manager"},
+      {"state": "Approved", "doc_status": 1, "allow_edit": "Accounts Manager"},
+      {"state": "Rejected", "doc_status": 1, "allow_edit": "Accounts Manager"}
+    ],
+    "transitions": [
+      {"state": "Submitted", "action": "Submit for Verification", "next_state": "Pending Verification", "allowed": "Customer"},
+      {"state": "Pending Verification", "action": "Approve", "next_state": "Approved", "allowed": "Accounts Manager"},
+      {"state": "Pending Verification", "action": "Reject", "next_state": "Rejected", "allowed": "Accounts Manager"}
+    ]
+  },
+  {
+    "doctype": "Workflow",
+    "workflow_name": "Rental Booking Flow",
+    "document_type": "Rental Booking",
+    "is_active": 1,
+    "states": [
+      {"state": "Draft", "doc_status": 0},
+      {"state": "Quoted", "doc_status": 0},
+      {"state": "Deposit Pending", "doc_status": 1},
+      {"state": "Confirmed", "doc_status": 1},
+      {"state": "Dispatched", "doc_status": 1},
+      {"state": "At Customer", "doc_status": 1},
+      {"state": "Returned", "doc_status": 1},
+      {"state": "Completed", "doc_status": 1},
+      {"state": "Cancelled", "doc_status": 2}
+    ],
+    "transitions": [
+      {"state": "Draft", "action": "Quote", "next_state": "Quoted", "allowed": "Delights Sales"},
+      {"state": "Quoted", "action": "Request Deposit", "next_state": "Deposit Pending", "allowed": "Delights Sales"},
+      {"state": "Deposit Pending", "action": "Confirm", "next_state": "Confirmed", "allowed": "Delights Operations"},
+      {"state": "Confirmed", "action": "Dispatch", "next_state": "Dispatched", "allowed": "Delights Operations"},
+      {"state": "Dispatched", "action": "Mark At Customer", "next_state": "At Customer", "allowed": "Delights Operations"},
+      {"state": "At Customer", "action": "Mark Returned", "next_state": "Returned", "allowed": "Delights Operations"},
+      {"state": "Returned", "action": "Complete", "next_state": "Completed", "allowed": "Accounts Manager"}
+    ]
+  },
+  {
+    "doctype": "Workflow",
+    "workflow_name": "Glamorous Event Flow",
+    "document_type": "Glamorous Event",
+    "is_active": 1,
+    "states": [
+      {"state": "Enquiry", "doc_status": 0},
+      {"state": "Quoted", "doc_status": 0},
+      {"state": "Deposit Pending", "doc_status": 1},
+      {"state": "Confirmed", "doc_status": 1},
+      {"state": "In Preparation", "doc_status": 1},
+      {"state": "Delivered", "doc_status": 1},
+      {"state": "Settled", "doc_status": 1},
+      {"state": "Completed", "doc_status": 1},
+      {"state": "Cancelled", "doc_status": 2}
+    ],
+    "transitions": [
+      {"state": "Enquiry", "action": "Quote", "next_state": "Quoted", "allowed": "Delights Sales"},
+      {"state": "Quoted", "action": "Request Deposit", "next_state": "Deposit Pending", "allowed": "Delights Sales"},
+      {"state": "Deposit Pending", "action": "Confirm", "next_state": "Confirmed", "allowed": "Delights Operations"},
+      {"state": "Confirmed", "action": "Start Preparation", "next_state": "In Preparation", "allowed": "Delights Operations"},
+      {"state": "In Preparation", "action": "Mark Delivered", "next_state": "Delivered", "allowed": "Delights Operations"},
+      {"state": "Delivered", "action": "Settle", "next_state": "Settled", "allowed": "Accounts Manager"},
+      {"state": "Settled", "action": "Complete", "next_state": "Completed", "allowed": "Accounts Manager"}
+    ]
+  }
+]

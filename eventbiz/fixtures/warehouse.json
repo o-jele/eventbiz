@@ -1,0 +1,49 @@
+[
+  {
+    "doctype": "Warehouse",
+    "warehouse_name": "Creations Premises",
+    "company": "Glamorous Creations",
+    "is_group": 1
+  },
+  {
+    "doctype": "Warehouse",
+    "warehouse_name": "CREATIONS - SHOP - GC",
+    "company": "Glamorous Creations",
+    "parent_warehouse": "Creations Premises - GC",
+    "is_group": 0
+  },
+  {
+    "doctype": "Warehouse",
+    "warehouse_name": "CREATIONS - STORE - GC",
+    "company": "Glamorous Creations",
+    "parent_warehouse": "Creations Premises - GC",
+    "is_group": 0
+  },
+  {
+    "doctype": "Warehouse",
+    "warehouse_name": "Delights Premises",
+    "company": "Glamorous Delights",
+    "is_group": 1
+  },
+  {
+    "doctype": "Warehouse",
+    "warehouse_name": "DELIGHTS - BAKERY - GD",
+    "company": "Glamorous Delights",
+    "parent_warehouse": "Delights Premises - GD",
+    "is_group": 0
+  },
+  {
+    "doctype": "Warehouse",
+    "warehouse_name": "DELIGHTS - CATERING - GD",
+    "company": "Glamorous Delights",
+    "parent_warehouse": "Delights Premises - GD",
+    "is_group": 0
+  },
+  {
+    "doctype": "Warehouse",
+    "warehouse_name": "DELIGHTS - RENTAL - GD",
+    "company": "Glamorous Delights",
+    "parent_warehouse": "Delights Premises - GD",
+    "is_group": 0
+  }
+]

@@ -1,0 +1,92 @@
+{
+  "doctype": "DocType",
+  "name": "Glamorous Event",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 0,
+  "issubmittable": 1,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "company",
+    "customer",
+    "event_name",
+    "event_type",
+    "event_date",
+    "venue",
+    "venue_address",
+    "guest_count",
+    "status"
+  ],
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "customer",
+      "label": "Customer",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Customer"
+    },
+    {
+      "fieldname": "event_name",
+      "label": "Event Name",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "event_type",
+      "label": "Event Type",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Wedding\nFuneral\nCorporate\nParty\nFunction\nOther"
+    },
+    {
+      "fieldname": "event_date",
+      "label": "Event Date",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "venue",
+      "label": "Venue",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "venue_address",
+      "label": "Venue Address",
+      "fieldtype": "Small Text",
+      "reqd": 0
+    },
+    {
+      "fieldname": "guest_count",
+      "label": "Guests",
+      "fieldtype": "Int",
+      "reqd": 0
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Enquiry\nQuoted\nDeposit Pending\nConfirmed\nIn Preparation\nDelivered\nReturns Pending\nSettled\nCompleted\nCancelled"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ]
+}

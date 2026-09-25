@@ -1,0 +1,58 @@
+{
+  "doctype": "DocType",
+  "name": "Rental Return Item",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 1,
+  "issubmittable": 0,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "item",
+    "qty_dispatched",
+    "qty_good",
+    "qty_damaged",
+    "qty_missing",
+    "remarks"
+  ],
+  "fields": [
+    {
+      "fieldname": "item",
+      "label": "Item",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Item"
+    },
+    {
+      "fieldname": "qty_dispatched",
+      "label": "Dispatched",
+      "fieldtype": "Int",
+      "reqd": 1
+    },
+    {
+      "fieldname": "qty_good",
+      "label": "Good",
+      "fieldtype": "Int",
+      "reqd": 1
+    },
+    {
+      "fieldname": "qty_damaged",
+      "label": "Damaged",
+      "fieldtype": "Int",
+      "reqd": 1
+    },
+    {
+      "fieldname": "qty_missing",
+      "label": "Missing",
+      "fieldtype": "Int",
+      "reqd": 1
+    },
+    {
+      "fieldname": "remarks",
+      "label": "Remarks",
+      "fieldtype": "Small Text",
+      "reqd": 0
+    }
+  ],
+  "permissions": []
+}

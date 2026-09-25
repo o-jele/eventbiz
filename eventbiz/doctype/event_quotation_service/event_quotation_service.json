@@ -1,0 +1,59 @@
+{
+  "doctype": "DocType",
+  "name": "Event Quotation Service",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 1,
+  "issubmittable": 0,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "service_type",
+    "item",
+    "description",
+    "qty",
+    "rate",
+    "amount"
+  ],
+  "fields": [
+    {
+      "fieldname": "service_type",
+      "label": "Service Type",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Rental\nCatering\nBakery\nDelivery\nSetup\nStaffing\nOther"
+    },
+    {
+      "fieldname": "item",
+      "label": "Item",
+      "fieldtype": "Link",
+      "reqd": 0,
+      "options": "Item"
+    },
+    {
+      "fieldname": "description",
+      "label": "Description",
+      "fieldtype": "Small Text",
+      "reqd": 1
+    },
+    {
+      "fieldname": "qty",
+      "label": "Qty",
+      "fieldtype": "Float",
+      "reqd": 1
+    },
+    {
+      "fieldname": "rate",
+      "label": "Rate",
+      "fieldtype": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "amount",
+      "label": "Amount",
+      "fieldtype": "Currency",
+      "reqd": 1
+    }
+  ],
+  "permissions": []
+}

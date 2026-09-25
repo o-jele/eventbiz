@@ -1,0 +1,93 @@
+{
+  "doctype": "DocType",
+  "name": "Catering Order",
+  "module": "Eventbiz",
+  "custom": 0,
+  "istable": 0,
+  "issubmittable": 1,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "company",
+    "customer",
+    "event",
+    "service_date",
+    "guest_count",
+    "menu",
+    "rate_per_head",
+    "amount",
+    "status"
+  ],
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "customer",
+      "label": "Customer",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Customer"
+    },
+    {
+      "fieldname": "event",
+      "label": "Event",
+      "fieldtype": "Link",
+      "reqd": 0,
+      "options": "Glamorous Event"
+    },
+    {
+      "fieldname": "service_date",
+      "label": "Service Date",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "guest_count",
+      "label": "Guests",
+      "fieldtype": "Int",
+      "reqd": 1
+    },
+    {
+      "fieldname": "menu",
+      "label": "Menu",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Item"
+    },
+    {
+      "fieldname": "rate_per_head",
+      "label": "Rate Per Head",
+      "fieldtype": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "amount",
+      "label": "Amount",
+      "fieldtype": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "reqd": 1,
+      "options": "Draft\nConfirmed\nIn Preparation\nDelivered\nInvoiced\nCompleted\nCancelled"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ]
+}
