@@ -1,5 +1,12 @@
 # Glamorous — SPEC.md
-## Two-Company ERPNext Implementation (Creations + Delights)
+## Two-Company Implementation (Creations + Delights)
+
+> **Implementation note (HestiaCP decision):** the deployable app is plain
+> PHP 8.1+ + MySQL under `public_html/` (see `README.md`,
+> `docs/hestia-deployment.md`). This SPEC remains the normative **domain
+> model** (companies, warehouses, doctypes/fields, workflows, acceptance
+> tests T1–T8); the Frappe/ERPNext stack in §27–28 and `eventbiz/` is kept
+> for reference only and is NOT deployed (needs 4GB+ RAM, root services).
 
 **Version:** 1.0.0-draft  
 **Status:** Ready for implementation  

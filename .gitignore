@@ -4,3 +4,7 @@ __pycache__/
 dist/
 build/
 .DS_Store
+# Glamorous PHP app secrets & runtime (never commit)
+public_html/config.php
+public_html/uploads/
+*.zip

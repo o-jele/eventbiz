@@ -1,0 +1,28 @@
+:root { --ink: #222; --mut: #666; --line: #e5e5e5; --bg: #faf7f2; --acc: #8a4b2a; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+.topbar { display: flex; gap: 1rem; align-items: center; padding: .7rem 1rem; background: #fff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.brand { font-weight: 800; font-size: 1.25rem; color: var(--acc); text-decoration: none; }
+.topbar nav { display: flex; gap: .8rem; flex-wrap: wrap; }
+.topbar a { color: var(--ink); text-decoration: none; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 1.2rem; }
+.foot { text-align: center; color: var(--mut); padding: 2rem 1rem; }
+.hero { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 1.2rem; }
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.btn { display: inline-block; background: var(--acc); color: #fff; border: 0; border-radius: 8px; padding: .55rem 1rem; cursor: pointer; text-decoration: none; }
+.btn.sec { background: #555; }
+.tbl { width: 100%; border-collapse: collapse; background: #fff; }
+.tbl th, .tbl td { border: 1px solid var(--line); padding: .45rem .6rem; text-align: left; vertical-align: top; }
+.fld { display: block; margin: .6rem 0; }
+.fld span { display: block; font-weight: 600; margin-bottom: .2rem; }
+.fld input, .fld select, .fld textarea { width: 100%; padding: .5rem; border: 1px solid var(--line); border-radius: 6px; }
+.flash { padding: .6rem .9rem; border-radius: 8px; }
+.flash.ok { background: #e6f4ea; }
+.flash.err { background: #fdecea; }
+.badge { display: inline-block; font-size: .75rem; padding: .1rem .5rem; border-radius: 20px; color: #fff; }
+.badge-gc { background: #2a7a4b; }
+.badge-gd { background: #8a4b2a; }
+.mut { color: var(--mut); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 700px) { .hero, .row2 { grid-template-columns: 1fr; } }
