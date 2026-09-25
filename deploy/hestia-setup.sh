@@ -28,9 +28,14 @@ done
   echo "Missing required args. See header usage."; exit 1; }
 [[ $EUID -ne 0 ]] && { echo "Run as root."; exit 1; }
 
-export VESTA=/usr/local/vesta 2>/dev/null || true
-BIN=/usr/local/vesta/bin
-[[ -x "$BIN/v-list-users" ]] || { echo "HestiaCP not found at /usr/local/vesta."; exit 1; }
+if [[ -d /usr/local/hestia/bin ]]; then
+  BIN=/usr/local/hestia/bin
+elif [[ -x /usr/local/vesta/bin/v-list-users ]]; then
+  BIN=/usr/local/vesta/bin
+else
+  echo "HestiaCP not found (looked in /usr/local/hestia and /usr/local/vesta)."
+  exit 1
+fi
 
 if ! "$BIN/v-list-users" | grep -q "^$USER:"; then
   echo "-> Creating Hestia user $USER (you will set its password in the panel)"
