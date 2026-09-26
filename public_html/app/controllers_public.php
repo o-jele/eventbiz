@@ -131,8 +131,8 @@ function pg_checkout(): void
                 $amt = $qty * (float) $it['price'];
                 $sub += $amt;
                 db_exec(
-                    'INSERT INTO sales_order_items (order_id, item_id, qty, rate, amount) VALUES (?,?,?,?,?)',
-                    [$orderId, $id, $qty, $it['price'], $amt]
+                    'INSERT INTO sales_order_items (order_id, item_id, description, qty, rate, amount) VALUES (?,?,?,?,?,?)',
+                    [$orderId, $id, $it['name'], $qty, $it['price'], $amt]
                 );
                 post_stock($id, (int) $wh['id'], -$qty, 'sales_order', $orderId, 'Website checkout');
             }

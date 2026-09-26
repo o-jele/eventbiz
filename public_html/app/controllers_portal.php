@@ -10,6 +10,18 @@ function pg_portal(): void
         return;
     }
     $cid = (int) $u['customer_id'];
+    // Customer decision on a quotation (approve/reject), POST only.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_decision'], $_POST['qid'])) {
+        check_csrf();
+        $q = db_one('SELECT * FROM quotations WHERE id = ?', [(int) $_POST['qid']]);
+        if (!$q || (int) $q['customer_id'] !== $cid || $q['status'] !== 'Sent') {
+            exit('Quotation cannot be decided.');
+        }
+        $to = $_POST['quote_decision'] === 'approve' ? 'Approved' : 'Rejected';
+        db_exec('UPDATE quotations SET status=? WHERE id=?', [$to, (int) $q['id']]);
+        flash('Quotation #' . $q['id'] . ' ' . strtolower($to) . '. Thank you!');
+        redirect('/my-glamorous');
+    }
     $orders = db_all(
         'SELECT o.*, c.name AS company FROM sales_orders o JOIN companies c ON c.id=o.company_id
          WHERE o.customer_id = ? ORDER BY o.id DESC LIMIT 20', [$cid]
@@ -44,7 +56,7 @@ function pg_portal(): void
     foreach ($invoices as $i) {
         $bal = (float) $i['total'] - (float) $i['paid'];
         $pay = $bal > 0 ? ' <a href="/declare?invoice_id=' . (int) $i['id'] . '">Declare payment</a>' : '';
-        $ir[] = [brand_badge($i['company']), e($i['label']) . ' #' . $i['id'],
+        $ir[] = [brand_badge($i['company']), e($i['label']) . ' #' . $i['id'] . ' <a href="/invoice/' . (int) $i['id'] . '" target="_blank">Print</a>',
                  money((float) $i['total']), money((float) $i['paid']), money($bal) . $pay, e($i['status'])];
     }
     $rr = [];
@@ -71,13 +83,34 @@ function pg_portal(): void
     foreach ($decls as $d) {
         $dr[] = [brand_badge($d['company']), '#' . $d['id'], money((float) $d['amount']), e($d['method']), e($d['status'])];
     }
+    $quotes = db_all(
+        'SELECT q.*, v.name AS event FROM quotations q JOIN events v ON v.id=q.event_id
+         WHERE q.customer_id = ? ORDER BY q.id DESC LIMIT 20', [$cid]
+    );
+    $qr = [];
+    foreach ($quotes as $q) {
+        $services = db_all('SELECT description, qty, amount FROM quotation_services WHERE quotation_id = ? ORDER BY id', [(int) $q['id']]);
+        $slist = [];
+        foreach ($services as $s) {
+            $slist[] = e($s['description']) . ' ×' . e((string) $s['qty']) . ' = ' . money((float) $s['amount']);
+        }
+        $decide = $q['status'] === 'Sent'
+            ? '<form method="post" style="display:inline">' . csrf_field() . '
+               <input type="hidden" name="qid" value="' . (int) $q['id'] . '">
+               <button class="btn sec" name="quote_decision" value="approve">Approve</button>
+               <button class="btn sec" name="quote_decision" value="reject">Reject</button></form>' : '';
+        $qr[] = [brand_badge(company_name((int) $q['company_id'])), '#' . $q['id'] . ' ' . e($q['event']),
+                 implode('<br>', $slist) . '<br><strong>Total ' . money((float) $q['grand_total']) . '</strong>',
+                 e($q['status']) . ' ' . $decide];
+    }
     layout('My Glamorous', '<h1>My Glamorous</h1>
       <h2>Orders</h2>' . ($or ? table(['Brand', 'Order', 'Total', 'Status'], $or) : '<p class="mut">None yet.</p>') . '
       <h2>Invoices &amp; payments</h2>' . ($ir ? table(['Brand', 'Invoice', 'Total', 'Paid', 'Balance', 'Status'], $ir) : '<p class="mut">None yet.</p>') . '
       <h2>Rental bookings</h2>' . ($rr ? table(['Brand', 'Booking', 'Event date', 'Total', 'Status'], $rr) : '<p class="mut">None yet.</p>') . '
       <h2>Cake orders</h2>' . ($kr ? table(['Brand', 'Order', 'Required', 'Status'], $kr) : '<p class="mut">None yet.</p>') . '
       <h2>Events</h2>' . ($er ? table(['Brand', 'Event', 'Date', 'Status'], $er) : '<p class="mut">None yet.</p>') . '
-      <h2>Payment declarations</h2>' . ($dr ? table(['Brand', 'Declaration', 'Amount', 'Method', 'Status'], $dr) : '<p class="mut">None yet.</p>'));
+      <h2>Payment declarations</h2>' . ($dr ? table(['Brand', 'Declaration', 'Amount', 'Method', 'Status'], $dr) : '<p class="mut">None yet.</p>') . '
+      <h2>Quotations</h2>' . ($qr ? table(['Brand', 'Quotation', 'Services', 'Status'], $qr) : '<p class="mut">None yet.</p>'));
 }
 
 /** Customer declares a manual payment (SPEC §8). Creates NO payment row until staff approve. */
@@ -184,4 +217,53 @@ function pg_declare(): void
       ' . field('Sender account / number (last digits)', '<input name="sender_detail">') . '
       ' . field('Proof (photo / screenshot)', '<input type="file" name="proof" accept="image/*,.pdf">') . '
       <button class="btn">Submit for verification</button></form></div>');
+}
+
+/** Printable invoice: owner customer or any staff role. */
+function pg_invoice(int $id): void
+{
+    $u = require_login();
+    $inv = db_one(
+        'SELECT i.*, c.name AS company, k.name AS customer, k.phone FROM invoices i
+         JOIN companies c ON c.id=i.company_id JOIN customers k ON k.id=i.customer_id WHERE i.id = ?', [$id]
+    );
+    if (!$inv) {
+        http_response_code(404);
+        exit('Invoice not found.');
+    }
+    $staff = in_array($u['role'], STAFF_ROLES, true);
+    if (!$staff && (int) $inv['customer_id'] !== (int) $u['customer_id']) {
+        http_response_code(403);
+        exit('Not your invoice.');
+    }
+    $lines = [];
+    if ($inv['order_id']) {
+        $lines = db_all(
+            'SELECT s.qty, s.rate, s.amount, COALESCE(s.description, i.name) AS name FROM sales_order_items s
+             JOIN items i ON i.id=s.item_id WHERE s.order_id = ? ORDER BY s.id', [(int) $inv['order_id']]
+        );
+    }
+    $lr = [];
+    if ($lines) {
+        foreach ($lines as $l) {
+            $lr[] = [e($l['name']), e((string) $l['qty']), money((float) $l['rate']), money((float) $l['amount'])];
+        }
+    } else {
+        $lr[] = [e($inv['label']), '1', money((float) $inv['total']), money((float) $inv['total'])];
+    }
+    $pays = db_all('SELECT * FROM payments WHERE invoice_id = ? ORDER BY id', [$id]);
+    $pr = [];
+    foreach ($pays as $p) {
+        $pr[] = [e($p['payment_date']), e($p['method']), e((string) ($p['reference'] ?? '')), money((float) $p['amount'])];
+    }
+    $bal = (float) $inv['total'] - (float) $inv['paid'];
+    layout('Invoice #' . $id, '<div class="card"><p><button class="btn sec" onclick="window.print()">Print</button></p>
+      <h1>' . e($inv['company']) . '</h1>
+      <h2>Invoice #' . (int) $inv['id'] . ' · ' . e($inv['created_at']) . '</h2>
+      <p>Bill to: <strong>' . e($inv['customer']) . '</strong> ' . e((string) $inv['phone']) . '<br>' . e($inv['label']) . '</p>'
+      . table(['Item', 'Qty', 'Rate', 'Amount'], $lr) . '
+      <p style="text-align:right"><strong>Total: MWK ' . money((float) $inv['total']) . '</strong><br>
+      Paid: MWK ' . money((float) $inv['paid']) . '<br>Balance: MWK ' . money($bal) . ' (' . e($inv['status']) . ')</p>'
+      . ($pr ? '<h3>Payments received</h3>' . table(['Date', 'Method', 'Reference', 'Amount'], $pr) : '<p class="mut">No payments recorded yet.</p>')
+      . '</div>');
 }

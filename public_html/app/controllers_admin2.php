@@ -55,8 +55,9 @@ function pg_admin_bakery(): void
              (float) $k['price'], (float) $k['price'], (int) $u['id']]
         );
         $oid = db_last_id();
-        db_exec('INSERT INTO sales_order_items (order_id, item_id, qty, rate, amount) VALUES (?,?,?,?,?)',
-            [$oid, (int) $k['product_item_id'], (float) $k['quantity'], $rate, (float) $k['price']]);
+        $pname = db_one('SELECT name FROM items WHERE id = ?', [(int) $k['product_item_id']]);
+        db_exec('INSERT INTO sales_order_items (order_id, item_id, description, qty, rate, amount) VALUES (?,?,?,?,?,?)',
+            [$oid, (int) $k['product_item_id'], $pname ? $pname['name'] : 'Cake', (float) $k['quantity'], $rate, (float) $k['price']]);
         $inv = make_invoice((int) $k['company_id'], (int) $k['customer_id'], $oid, 'Cake order #' . $k['id'], (float) $k['price']);
         db_exec('UPDATE invoices SET cake_order_id=? WHERE id=?', [(int) $k['id'], $inv]);
         db_exec("UPDATE cake_orders SET status='Confirmed' WHERE id=?", [(int) $k['id']]);
@@ -65,9 +66,10 @@ function pg_admin_bakery(): void
         redirect('/admin/bakery');
     }
     // Advance production one step.
-    if (($_GET['prod'] ?? '') !== '' && ($_GET['to'] ?? '') !== '') {
-        $k = db_one('SELECT * FROM cake_orders WHERE id = ?', [(int) $_GET['prod']]);
-        $to = $_GET['to'];
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['prod'], $_POST['to'])) {
+        check_csrf();
+        $k = db_one('SELECT * FROM cake_orders WHERE id = ?', [(int) $_POST['prod']]);
+        $to = $_POST['to'];
         $i = array_search($k['production_status'] ?? '', $flow, true);
         if ($k && $i !== false && ($flow[$i + 1] ?? null) === $to) {
             guard_company(company_name((int) $k['company_id']));
@@ -77,8 +79,9 @@ function pg_admin_bakery(): void
         }
         redirect('/admin/bakery');
     }
-    if (($_GET['done'] ?? '') !== '') {
-        db_exec("UPDATE cake_orders SET status='Completed' WHERE id=?", [(int) $_GET['done']]);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_cake'])) {
+        check_csrf();
+        db_exec("UPDATE cake_orders SET status='Completed' WHERE id=?", [(int) $_POST['complete_cake']]);
         redirect('/admin/bakery');
     }
     $f = get_param('f');
@@ -100,10 +103,15 @@ function pg_admin_bakery(): void
         }
         $i = array_search($r['production_status'], $flow, true);
         if ($i !== false && isset($flow[$i + 1])) {
-            $acts .= ' <a href="/admin/bakery?prod=' . (int) $r['id'] . '&to=' . $flow[$i + 1] . '">→ ' . $flow[$i + 1] . '</a>';
+            $acts .= ' <form method="post" style="display:inline">' . csrf_field() . '
+              <input type="hidden" name="prod" value="' . (int) $r['id'] . '">
+              <input type="hidden" name="to" value="' . $flow[$i + 1] . '">
+              <button class="btn sec">→ ' . $flow[$i + 1] . '</button></form>';
         }
         if ($r['status'] === 'Delivered') {
-            $acts .= ' <a href="/admin/bakery?done=' . (int) $r['id'] . '">Complete</a>';
+            $acts .= ' <form method="post" style="display:inline">' . csrf_field() . '
+              <input type="hidden" name="complete_cake" value="' . (int) $r['id'] . '">
+              <button class="btn sec">Complete</button></form>';
         }
         $tr[] = [brand_badge($r['company']), '#' . $r['id'] . ' ' . e($r['product']),
                  e($r['customer']), e($r['required_date']),
@@ -120,12 +128,13 @@ function pg_admin_catering(): void
 {
     require_role(['admin', 'accounts', 'delights_sales', 'delights_ops']);
     $flow = ['Draft' => 'Confirmed', 'Confirmed' => 'In Preparation', 'In Preparation' => 'Delivered', 'Delivered' => 'Completed'];
-    if (($_GET['set'] ?? '') !== '' && ($_GET['to'] ?? '') !== '') {
-        $c = db_one('SELECT * FROM catering_orders WHERE id = ?', [(int) $_GET['set']]);
-        if ($c && ($flow[$c['status']] ?? null) === $_GET['to']) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['catering_set'], $_POST['catering_to'])) {
+        check_csrf();
+        $c = db_one('SELECT * FROM catering_orders WHERE id = ?', [(int) $_POST['catering_set']]);
+        if ($c && ($flow[$c['status']] ?? null) === $_POST['catering_to']) {
             guard_company(company_name((int) $c['company_id']));
-            db_exec('UPDATE catering_orders SET status=? WHERE id=?', [$_GET['to'], (int) $c['id']]);
-            flash('Catering #' . $c['id'] . ' → ' . $_GET['to'] . '.');
+            db_exec('UPDATE catering_orders SET status=? WHERE id=?', [$_POST['catering_to'], (int) $c['id']]);
+            flash('Catering #' . $c['id'] . ' → ' . $_POST['catering_to'] . '.');
         }
         redirect('/admin/catering');
     }
@@ -138,7 +147,10 @@ function pg_admin_catering(): void
     $tr = [];
     foreach ($rows as $r) {
         $next = isset($flow[$r['status']])
-            ? ' <a href="/admin/catering?set=' . (int) $r['id'] . '&to=' . $flow[$r['status']] . '">→ ' . $flow[$r['status']] . '</a>' : '';
+            ? ' <form method="post" style="display:inline">' . csrf_field() . '
+               <input type="hidden" name="catering_set" value="' . (int) $r['id'] . '">
+               <input type="hidden" name="catering_to" value="' . $flow[$r['status']] . '">
+               <button class="btn sec">→ ' . $flow[$r['status']] . '</button></form>' : '';
         $tr[] = [brand_badge($r['company']), '#' . $r['id'] . ' ' . e($r['menu']),
                  e($r['event'] ?? '—'), e($r['service_date']) . ' · ' . (int) $r['guests'] . ' guests',
                  money((float) $r['amount']), e($r['status']) . $next];
@@ -321,8 +333,8 @@ function pg_admin_pos(): void
                 $amt = $q * (float) $it['price'];
                 $sub += $amt;
                 $n++;
-                db_exec('INSERT INTO sales_order_items (order_id, item_id, qty, rate, amount) VALUES (?,?,?,?,?)',
-                    [$oid, $iid, $q, $it['price'], $amt]);
+                db_exec('INSERT INTO sales_order_items (order_id, item_id, description, qty, rate, amount) VALUES (?,?,?,?,?,?)',
+                    [$oid, $iid, $it['name'], $q, $it['price'], $amt]);
                 post_stock($iid, (int) $wh['id'], -$q, 'sales_order', $oid, 'Counter sale');
             }
             if ($n === 0) {

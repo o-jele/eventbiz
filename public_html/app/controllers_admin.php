@@ -37,8 +37,9 @@ function pg_admin(): void
 function pg_admin_enquiries(): void
 {
     $u = require_role(['admin', 'accounts', 'delights_sales', 'creations_staff']);
-    if (($_GET['convert'] ?? '') !== '' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
-        $enq = db_one('SELECT * FROM enquiries WHERE id = ?', [(int) $_GET['convert']]);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_enquiry'])) {
+        check_csrf();
+        $enq = db_one('SELECT * FROM enquiries WHERE id = ?', [(int) $_POST['convert_enquiry']]);
         if ($enq) {
             guard_company(company_name((int) $enq['company_id']));
             $cid = $enq['customer_id'] ?: find_or_create_customer($enq['name'], (string) $enq['phone'], (string) $enq['email']);
@@ -54,8 +55,9 @@ function pg_admin_enquiries(): void
             redirect('/admin/events?view=' . $evId);
         }
     }
-    if (isset($_GET['close'])) {
-        db_exec("UPDATE enquiries SET status='Closed' WHERE id=?", [(int) $_GET['close']]);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_enquiry'])) {
+        check_csrf();
+        db_exec("UPDATE enquiries SET status='Closed' WHERE id=?", [(int) $_POST['close_enquiry']]);
         redirect('/admin/enquiries');
     }
     $rows = db_all(
@@ -66,8 +68,12 @@ function pg_admin_enquiries(): void
     foreach ($rows as $r) {
         $tr[] = [brand_badge($r['company']), '#' . $r['id'] . ' ' . e($r['subject']),
                  e($r['name']) . '<br>' . e((string) $r['phone']), e($r['enquiry_type']) . '<br>' . e($r['status']),
-                 '<a href="/admin/enquiries?convert=' . (int) $r['id'] . '">Convert to event</a> ·
-                  <a href="/admin/enquiries?close=' . (int) $r['id'] . '">Close</a>'];
+                 '<form method="post" style="display:inline">' . csrf_field() . '
+                  <input type="hidden" name="convert_enquiry" value="' . (int) $r['id'] . '">
+                  <button class="btn sec">Convert to event</button></form> ·
+                  <form method="post" style="display:inline">' . csrf_field() . '
+                  <input type="hidden" name="close_enquiry" value="' . (int) $r['id'] . '">
+                  <button class="btn sec">Close</button></form>'];
     }
     layout('Enquiries', admin_nav() . '<h1>Enquiry inbox</h1>' .
         ($tr ? table(['Brand', 'Subject', 'Contact', 'Type/Status', ''], $tr) : '<p class="mut">Inbox zero.</p>'));
@@ -215,7 +221,7 @@ function pg_admin_event_view(int $id): void
     $qr = [];
     foreach ($quotes as $q) {
         $qr[] = ['#' . $q['id'], money((float) $q['grand_total']), money((float) $q['deposit_required']),
-                 e($q['status']), $q['status'] === 'Sent'
+                 e($q['status']), in_array($q['status'], ['Sent', 'Approved'], true)
                     ? '<form method="post" style="display:inline">' . csrf_field() . '
                        <input type="hidden" name="convert_qid" value="' . (int) $q['id'] . '">
                        <button class="btn sec">Convert to order</button></form>' : ''];
@@ -236,7 +242,7 @@ function pg_admin_quotation_convert(array $ev, int $qid, array $u): void
 {
     require_role(['admin', 'accounts', 'delights_sales']);
     $q = db_one('SELECT * FROM quotations WHERE id = ? AND event_id = ?', [$qid, (int) $ev['id']]);
-    if (!$q || $q['status'] !== 'Sent') {
+    if (!$q || !in_array($q['status'], ['Sent', 'Approved'], true)) {
         exit('Quotation cannot be converted.');
     }
     $services = db_all('SELECT s.*, i.name AS item_name, i.item_type FROM quotation_services s
@@ -255,8 +261,8 @@ function pg_admin_quotation_convert(array $ev, int $qid, array $u): void
                 throw new RuntimeException('Every service row needs an Item before converting.');
             }
             db_exec(
-                'INSERT INTO sales_order_items (order_id, item_id, qty, rate, amount) VALUES (?,?,?,?,?)',
-                [$orderId, $s['item_id'], $s['qty'], $s['rate'], $s['amount']]
+                'INSERT INTO sales_order_items (order_id, item_id, description, qty, rate, amount) VALUES (?,?,?,?,?,?)',
+                [$orderId, $s['item_id'], $s['description'], $s['qty'], $s['rate'], $s['amount']]
             );
         }
         // Rental rows → one booking (availability enforced).
@@ -352,11 +358,14 @@ function pg_admin_rental_view(int $id, array $u): void
     }
     guard_company($b['company']);
     $items = db_all('SELECT i.*, t.name AS item_name FROM rental_booking_items i JOIN items t ON t.id=i.item_id WHERE i.booking_id = ?', [$id]);
-    // Status moves.
-    foreach (['Confirmed' => ['Deposit Pending', 'Quoted'], 'Dispatched' => ['Confirmed'],
-              'At Customer' => ['Dispatched'], 'Return Due' => ['At Customer'],
-              'Cancelled' => ['Quoted', 'Deposit Pending']] as $to => $froms) {
-        if (($_GET['set'] ?? '') === $to && in_array($b['status'], $froms, true)) {
+    // Status moves (POST only).
+    $flow = ['Confirmed' => ['Deposit Pending', 'Quoted'], 'Dispatched' => ['Confirmed'],
+             'At Customer' => ['Dispatched'], 'Return Due' => ['At Customer'],
+             'Cancelled' => ['Quoted', 'Deposit Pending']];
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set'])) {
+        check_csrf();
+        $to = $_POST['set'];
+        if (isset($flow[$to]) && in_array($b['status'], $flow[$to], true)) {
             if ($to === 'Confirmed') {
                 foreach ($items as $it) {
                     $avail = rental_available((int) $it['item_id'], $b['event_date'], $b['return_expected'], $id);
@@ -368,11 +377,12 @@ function pg_admin_rental_view(int $id, array $u): void
             }
             db_exec('UPDATE rental_bookings SET status=? WHERE id=?', [$to, $id]);
             flash('Booking #' . $id . ' → ' . $to . '.');
-            redirect('/admin/rentals?view=' . $id);
         }
+        redirect('/admin/rentals?view=' . $id);
     }
-    // Standalone invoice for bookings not covered by an event invoice.
-    if (($_GET['invoice'] ?? '') === '1') {
+    // Standalone invoice for bookings not covered by an event invoice (POST only).
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_invoice'])) {
+        check_csrf();
         $invId = rental_ensure_invoice($id, $u);
         flash('Invoice #' . $invId . ' ready.');
         redirect('/admin/rentals?view=' . $id);
@@ -468,13 +478,16 @@ function pg_admin_rental_view(int $id, array $u): void
         $rr[] = ['#' . $r['id'], e($r['return_actual']), money((float) $r['refund_due']), e($r['status'])];
     }
     $actions = '';
-    foreach (['Confirmed', 'Dispatched', 'At Customer', 'Return Due'] as $s) {
-        $actions .= ' <a class="btn sec" href="/admin/rentals?view=' . $id . '&set=' . $s . '">→ ' . $s . '</a>';
+    foreach (['Confirmed', 'Dispatched', 'At Customer', 'Return Due', 'Cancelled'] as $s) {
+        $actions .= ' <form method="post" action="/admin/rentals?view=' . $id . '" style="display:inline">' . csrf_field() . '
+          <input type="hidden" name="set" value="' . $s . '"><button class="btn sec">→ ' . $s . '</button></form>';
     }
     layout('Booking #' . $id, admin_nav() . '<h1>Booking #' . $id . ' ' . brand_badge($b['company']) . '</h1>
       <p class="mut">' . e($b['customer']) . ' · ' . e($b['event_date']) . ' → ' . e($b['return_expected']) . ' · '
       . e($b['status']) . ' · deposit ' . money((float) $b['deposit_received']) . '/' . money((float) $b['deposit_required']) . '</p>
-      <p>' . $actions . ' <a class="btn sec" href="/admin/rentals?view=' . $id . '&invoice=1">Create invoice</a> <a class="btn" href="/admin/rentals?view=' . $id . '&return=1">Record return</a></p>
+      <p>' . $actions . ' <form method="post" action="/admin/rentals?view=' . $id . '" style="display:inline">' . csrf_field() . '
+        <input type="hidden" name="make_invoice" value="1"><button class="btn sec">Create invoice</button></form>
+        <a class="btn" href="/admin/rentals?view=' . $id . '&return=1">Record return</a></p>
       <h2>Items</h2>' . table(['Item', 'Qty', 'Rate', 'Amount'], $ir) . '
       <h2>Returns</h2>' . ($rr ? table(['#', 'Date', 'Refund', 'Status'], $rr) : '<p class="mut">None.</p>'));
 }
@@ -546,8 +559,9 @@ function pg_admin_payments(): void
 function pg_admin_orders(): void
 {
     require_staff();
-    if (($_GET['deliver'] ?? '') !== '') {
-        $o = db_one('SELECT * FROM sales_orders WHERE id = ?', [(int) $_GET['deliver']]);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['deliver'])) {
+        check_csrf();
+        $o = db_one('SELECT * FROM sales_orders WHERE id = ?', [(int) $_POST['deliver']]);
         $flow = ['Pending Arrangement' => 'Arranged', 'Arranged' => 'Out for Delivery', 'Out for Delivery' => 'Delivered'];
         if ($o && isset($flow[$o['delivery_status']])) {
             db_exec('UPDATE sales_orders SET delivery_status=? WHERE id=?', [$flow[$o['delivery_status']], $o['id']]);
@@ -562,7 +576,7 @@ function pg_admin_orders(): void
     $tr = [];
     foreach ($rows as $r) {
         $next = $r['delivery_status'] !== 'Delivered' && $r['delivery_status'] !== 'Not Required'
-            ? ' <a href="/admin/orders?deliver=' . (int) $r['id'] . '">advance</a>' : '';
+            ? ' <form method="post" style="display:inline">' . csrf_field() . '<input type="hidden" name="deliver" value="' . (int) $r['id'] . '"><button class="btn sec">advance</button></form>' : '';
         $tr[] = [brand_badge($r['company']), '#' . $r['id'], e($r['customer']), money((float) $r['grand_total']),
                  e($r['fulfilment_method']) . ' / ' . e($r['delivery_status']) . $next, e($r['status'])];
     }

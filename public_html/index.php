@@ -69,6 +69,10 @@ if (preg_match('#^/product/(\d+)$#', $path, $m)) {
     pg_product((int) $m[1]);
     exit;
 }
+if (preg_match('#^/invoice/(\d+)$#', $path, $m)) {
+    pg_invoice((int) $m[1]);
+    exit;
+}
 if (isset($routes[$path])) {
     $routes[$path]();
     exit;
