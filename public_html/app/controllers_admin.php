@@ -205,8 +205,8 @@ function pg_admin(): void
         return '<div class="stat' . ($alert ? ' alert' : '') . '"><div class="n">' . $num . '</div>'
             . '<div class="l">' . e($label) . '</div><p><a href="' . $link . '">Open →</a></p></div>';
     };
-    $tile = function (string $num, string $label, string $link, string $spark, string $badgeHtml, bool $alert = false): string {
-        return '<div class="stat' . ($alert ? ' alert' : '') . '"><div class="row"><div><div class="n">' . $num . '</div>'
+    $tile = function (string $num, string $label, string $link, string $spark, string $badgeHtml, bool $alert = false, float $raw = 0, int $dec = 0): string {
+        return '<div class="stat' . ($alert ? ' alert' : '') . '"><div class="row"><div><div class="n" data-count="' . $raw . '" data-dec="' . $dec . '">' . $num . '</div>'
             . '<div class="l">' . e($label) . ' ' . $badgeHtml . '</div></div><div>' . $spark . '</div></div>'
             . '<p><a href="' . $link . '">Open →</a></p></div>';
     };
@@ -265,22 +265,24 @@ function pg_admin(): void
     }
 
     layout('Staff', admin_nav()
-        . '<h1>' . $greet . ', ' . e($u['name']) . '</h1><p class="mut">' . date('l, j F Y') . ' – here is your business at a glance.</p>'
+        . '<div class="greet-row"><span class="avatar-lg">' . e(strtoupper(mb_substr($u['name'], 0, 1))) . '</span>'
+        . '<div><h1>' . $greet . ', <span class="grad-text">' . e($u['name']) . '</span></h1>'
+        . '<p class="mut" style="margin:0">' . date('l, j F Y') . ' · here is your business at a glance.</p></div></div>'
         . '<div class="quick-actions"><a class="btn sec" href="/admin/pos">New sale</a>'
         . '<a class="btn sec" href="/admin/events?new=1">New event</a>'
         . '<a class="btn sec" href="/admin/rentals?new=1">New booking</a>'
         . '<a class="btn sec" href="/admin/purchases">Receive stock</a></div>'
         . '<div class="stats">'
         . $tile((string) $open, 'open enquiries', '/admin/enquiries',
-            svg_sparkline($series($enqMap)), trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0)
+            svg_sparkline($series($enqMap)), trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0, (float) $open, 0)
         . $tile(money((float) ($pend['t'] ?? 0)), 'to verify (' . (int) ($pend['n'] ?? 0) . ')', '/admin/payments',
-            svg_sparkline($series($payMap)), trend_badge(trend_of((float) $pay7, (float) ($pPrev['t'] ?? 0))), ($pend['n'] ?? 0) > 0)
+            svg_sparkline($series($payMap)), trend_badge(trend_of((float) $pay7, (float) ($pPrev['t'] ?? 0))), ($pend['n'] ?? 0) > 0, (float) ($pend['t'] ?? 0), 2)
         . $tile(money($revTotal), 'revenue 30d', '/admin/reports',
-            svg_sparkline(array_column(array_values($days), 'value')), trend_badge(trend_of($revTotal, $revPrev)), false)
+            svg_sparkline(array_column(array_values($days), 'value')), trend_badge(trend_of($revTotal, $revPrev)), false, $revTotal, 2)
         . $tile(money((float) ($unpaid['t'] ?? 0)), 'owed (' . (int) ($unpaid['n'] ?? 0) . ' invoices)', '/admin/invoices?f=unpaid',
-            '', '', ($unpaid['n'] ?? 0) > 0)
+            '', '', ($unpaid['n'] ?? 0) > 0, (float) ($unpaid['t'] ?? 0), 2)
         . '</div>'
-        . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big">MWK ' . money($revTotal) . '</span>'
+        . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big" data-count="' . $revTotal . '" data-dec="2" data-pre="MWK ">MWK ' . money($revTotal) . '</span>'
         . trend_badge(trend_of($revTotal, $revPrev)) . '<span class="mut">vs prior 30d</span></div>'
         . '<div class="dash-grid" style="grid-template-columns:8fr 4fr">'
         . '<div>' . svg_area_chart(array_values($days)) . '</div>'
@@ -300,7 +302,11 @@ function pg_admin(): void
         . '</div><div>'
         . '<div class="panel"><h3>Latest activity</h3><div class="tabs">' . $tabs . '</div>' . ($feedHtml ?: '<p class="mut">Nothing yet.</p>') . '</div>'
         . '<div class="panel"><h3>Inventory alerts</h3>' . ($invHtml ? '<ul class="feed">' . $invHtml . '</ul>' : '<p class="mut">Stock levels healthy.</p>') . '</div>'
-        . '</div></div>');
+        . '</div></div>'
+        . '<script>(function(){function fmt(v,dec){return Number(v).toLocaleString("en-US",{minimumFractionDigits:dec,maximumFractionDigits:dec});}'
+        . 'document.querySelectorAll("[data-count]").forEach(function(el){var target=parseFloat(el.dataset.count||"0"),dec=parseInt(el.dataset.dec||"0",10),pre=el.dataset.pre||"";'
+        . 'if(!isFinite(target))return;var t0=null;function step(t){if(!t0)t0=t;var p=Math.min(1,(t-t0)/800),e=1-Math.pow(1-p,3);'
+        . 'el.textContent=pre+fmt(target*e,dec);if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);});})();</script>');
 }
 
 // ---------- Enquiries ----------
