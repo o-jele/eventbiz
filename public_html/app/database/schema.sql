@@ -325,6 +325,7 @@ CREATE TABLE IF NOT EXISTS rental_bookings (
   deposit_required DECIMAL(14,2) NOT NULL DEFAULT 0,
   deposit_received DECIMAL(14,2) NOT NULL DEFAULT 0,
   status VARCHAR(20) NOT NULL DEFAULT 'Draft',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (company_id) REFERENCES companies(id),
   FOREIGN KEY (customer_id) REFERENCES customers(id),
   FOREIGN KEY (event_id) REFERENCES events(id)

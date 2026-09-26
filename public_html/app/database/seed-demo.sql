@@ -130,17 +130,18 @@ INSERT INTO users (name, email, password_hash, role, customer_id) VALUES
    (SELECT id FROM customers WHERE email = 'jane@demo.mw'));
 
 -- Demo event + draft quotation + draft booking (safe: Draft holds no stock).
+-- Dates are relative so the dashboard demo stays alive whenever this is loaded.
 INSERT INTO events (company_id, customer_id, name, event_type, event_date, venue, guests, contact_person, contact_phone, status) VALUES
   ((SELECT id FROM companies WHERE abbr='GD'),
    (SELECT id FROM customers WHERE email='jane@demo.mw'),
-   'Demo Wedding - Banda', 'Wedding', '2026-12-19', 'Bingu Hall', 200,
+   'Demo Wedding - Banda', 'Wedding', CURDATE() + INTERVAL 10 DAY, 'Bingu Hall', 200,
    'Jane Banda', '0999111000', 'Enquiry');
 SET @ev = LAST_INSERT_ID();
 SET @cu = (SELECT id FROM customers WHERE email='jane@demo.mw');
 SET @gd = (SELECT id FROM companies WHERE abbr='GD');
 
 INSERT INTO quotations (company_id, customer_id, event_id, subtotal, delivery_setup, grand_total, deposit_required, valid_until, status) VALUES
-  (@gd, @cu, @ev, 2850000, 0, 2850000, 800000, '2026-11-30', 'Draft');
+  (@gd, @cu, @ev, 2850000, 0, 2850000, 800000, CURDATE() + INTERVAL 7 DAY, 'Draft');
 SET @q = LAST_INSERT_ID();
 
 INSERT INTO quotation_services (quotation_id, service_type, item_id, description, qty, rate, amount) VALUES
@@ -150,7 +151,7 @@ INSERT INTO quotation_services (quotation_id, service_type, item_id, description
 
 INSERT INTO rental_bookings (company_id, customer_id, event_id, booking_date, event_date, return_expected,
   fulfilment_method, delivery_charge, rental_total, grand_total, deposit_required, status) VALUES
-  (@gd, @cu, @ev, CURDATE(), '2026-12-19', '2026-12-21', 'Delivery', 50000, 600000, 650000, 200000, 'Draft');
+  (@gd, @cu, @ev, CURDATE(), CURDATE() + INTERVAL 10 DAY, CURDATE() + INTERVAL 12 DAY, 'Delivery', 50000, 600000, 650000, 200000, 'Draft');
 
 SET @b = LAST_INSERT_ID();
 

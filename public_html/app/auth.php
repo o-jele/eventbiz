@@ -76,3 +76,22 @@ function logout_user(): void
     unset($_SESSION['uid']);
     session_regenerate_id(true);
 }
+
+/** Company id this staff member is scoped to, or null for all-companies roles. */
+function staff_company_id(): ?int
+{
+    $u = current_user();
+    if (!$u || in_array($u['role'], ['admin', 'accounts'], true)) {
+        return null;
+    }
+    $map = [
+        'creations_staff' => 'Glamorous Creations',
+        'delights_sales' => 'Glamorous Delights',
+        'delights_ops' => 'Glamorous Delights',
+    ];
+    if (!isset($map[$u['role']])) {
+        return null;
+    }
+    $row = db_one('SELECT id FROM companies WHERE name = ?', [$map[$u['role']]]);
+    return $row ? (int) $row['id'] : null;
+}

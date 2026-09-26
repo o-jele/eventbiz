@@ -5,32 +5,116 @@ declare(strict_types=1);
 
 function admin_nav(): string
 {
-    return '<p><a href="/admin">Dashboard</a> · <a href="/admin/enquiries">Enquiries</a> ·
-      <a href="/admin/events">Events</a> · <a href="/admin/bakery">Bakery</a> ·
-      <a href="/admin/catering">Catering</a> · <a href="/admin/rentals">Rentals</a> ·
-      <a href="/admin/payments">Payments</a> · <a href="/admin/orders">Orders</a> ·
-      <a href="/admin/pos">Counter sale</a> · <a href="/admin/purchases">Purchasing</a> ·
-      <a href="/admin/transfers">Transfers</a> · <a href="/admin/invoices">Invoices</a> ·
-      <a href="/admin/items">Items</a> · <a href="/admin/users">Users</a> ·
-      <a href="/admin/reports">Reports</a></p>';
+    $groups = [
+        'Desk' => [['/admin', 'Dashboard'], ['/admin/enquiries', 'Enquiries'], ['/admin/events', 'Events'],
+                   ['/admin/bakery', 'Bakery'], ['/admin/catering', 'Catering'], ['/admin/rentals', 'Rentals']],
+        'Money' => [['/admin/payments', 'Payments'], ['/admin/orders', 'Orders'], ['/admin/invoices', 'Invoices'],
+                    ['/admin/pos', 'Counter sale']],
+        'Stock' => [['/admin/items', 'Items'], ['/admin/purchases', 'Purchasing'], ['/admin/transfers', 'Transfers']],
+        'Setup' => [['/admin/users', 'Users'], ['/admin/reports', 'Reports']],
+    ];
+    $open = (int) (db_one("SELECT COUNT(*) AS c FROM enquiries WHERE status = 'Open'")['c'] ?? 0);
+    $pend = (int) (db_one("SELECT COUNT(*) AS c FROM payment_declarations WHERE status IN ('Submitted','Pending Verification')")['c'] ?? 0);
+    $hot = ['/admin/enquiries' => $open, '/admin/payments' => $pend];
+    $h = '<nav class="subnav">';
+    foreach ($groups as $g => $links) {
+        $h .= '<span class="grp">' . $g . '</span>';
+        foreach ($links as $link) {
+            [$url, $label] = $link;
+            $n = $hot[$url] ?? 0;
+            $h .= '<a href="' . $url . '"' . ($n ? ' class="hot"' : '') . '>' . $label . ($n ? ' (' . $n . ')' : '') . '</a>';
+        }
+    }
+    return $h . '</nav>';
 }
 
 function pg_admin(): void
 {
     $u = require_staff();
-    $open = db_one("SELECT COUNT(*) c FROM enquiries WHERE status = 'Open'")['c'];
-    $pend = db_one("SELECT COUNT(*) c FROM payment_declarations WHERE status IN ('Submitted','Pending Verification')")['c'];
-    $ret = db_one("SELECT COUNT(*) c FROM rental_bookings WHERE status IN ('At Customer','Return Due')")['c'];
-    $low = db_all('SELECT sku, name, stock_qty FROM items WHERE item_type = ? AND stock_qty <= reorder_level AND reorder_level > 0 LIMIT 10', ['stock']);
-    $lr = [];
-    foreach ($low as $l) {
-        $lr[] = [e($l['sku']), e($l['name']), e((string) $l['stock_qty'])];
+    $hour = (int) date('G');
+    $greet = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
+    $scope = staff_company_id();
+    $scp = $scope ? [$scope] : [];
+    $co = fn($a) => $scope ? " AND $a.company_id = ?" : '';
+
+    $open = (int) (db_one("SELECT COUNT(*) AS c FROM enquiries WHERE status = 'Open'")['c'] ?? 0);
+    $pend = db_one("SELECT COUNT(*) AS n, COALESCE(SUM(amount),0) AS t FROM payment_declarations WHERE status IN ('Submitted','Pending Verification')");
+    $ret = (int) (db_one("SELECT COUNT(*) AS c FROM rental_bookings WHERE status IN ('At Customer','Return Due')")['c'] ?? 0);
+    $unpaid = db_one(
+        'SELECT COUNT(*) AS n, COALESCE(SUM(i.total - i.paid),0) AS t FROM invoices i WHERE (i.total - i.paid) > 0' . $co('i'), $scp
+    );
+    $today = db_one(
+        'SELECT COUNT(*) AS n, COALESCE(SUM(grand_total),0) AS t FROM sales_orders WHERE DATE(created_at) = CURDATE()' . $co('sales_orders'), $scp
+    );
+    $upcoming = db_all(
+        "SELECT v.id, v.name, v.event_date, v.status, k.name AS customer FROM events v
+         JOIN customers k ON k.id = v.customer_id
+         WHERE v.event_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY)
+           AND v.status NOT IN ('Completed','Cancelled') ORDER BY v.event_date LIMIT 8"
+    );
+    $out = db_all(
+        "SELECT b.id, b.event_date, k.name AS customer FROM rental_bookings b
+         JOIN customers k ON k.id = b.customer_id
+         WHERE b.status IN ('Dispatched','At Customer') ORDER BY b.event_date LIMIT 6"
+    );
+    $feed = db_all(
+        "(SELECT 'order' AS t, CONCAT('Order #', o.id, ' · ', k.name, ' · MWK ', FORMAT(o.grand_total, 0)) AS d, o.created_at AS c
+           FROM sales_orders o JOIN customers k ON k.id = o.customer_id WHERE 1=1" . $co('o') . ")
+         UNION ALL (SELECT 'payment', CONCAT('Payment ', p.method, ' · MWK ', FORMAT(p.amount, 0)), p.created_at
+           FROM payments p WHERE 1=1" . $co('p') . ")
+         UNION ALL (SELECT 'enquiry', CONCAT(eq.enquiry_type, ': ', eq.subject), eq.created_at FROM enquiries eq)
+         UNION ALL (SELECT 'transfer', CONCAT('Transfer #', t.id), t.created_at FROM transfers t)
+         UNION ALL (SELECT 'rental', CONCAT('Booking #', b.id), b.created_at FROM rental_bookings b)
+         ORDER BY c DESC LIMIT 10",
+        array_merge($scp, $scp)
+    );
+    $low = db_all('SELECT sku, name, stock_qty FROM items WHERE item_type = ? AND stock_qty <= reorder_level AND reorder_level > 0 LIMIT 8', ['stock']);
+
+    $stat = function (string $num, string $label, string $link, bool $alert = false): string {
+        return '<div class="stat' . ($alert ? ' alert' : '') . '"><div class="n">' . $num . '</div>'
+            . '<div class="l">' . e($label) . '</div><p><a href="' . $link . '">Open →</a></p></div>';
+    };
+    $opsOnly = $u['role'] !== 'creations_staff';
+
+    $upHtml = '';
+    foreach ($upcoming as $v) {
+        $upHtml .= '<li><a href="/admin/events?view=' . (int) $v['id'] . '">' . e($v['name']) . '</a>'
+            . '<br><span class="t">' . e($v['event_date']) . ' · ' . e($v['customer']) . ' · ' . e($v['status']) . '</span></li>';
     }
-    layout('Staff', admin_nav() . '<h1>Staff dashboard</h1><div class="grid">
-      <div class="card"><h3>' . (int) $open . ' open enquiries</h3><p><a class="btn" href="/admin/enquiries">Triage</a></p></div>
-      <div class="card"><h3>' . (int) $pend . ' payments to verify</h3><p><a class="btn" href="/admin/payments">Verify</a></p></div>
-      <div class="card"><h3>' . (int) $ret . ' rentals awaiting return</h3><p><a class="btn" href="/admin/rentals">Returns</a></p></div>
-    </div><h2>Low stock</h2>' . ($lr ? table(['SKU', 'Item', 'Qty'], $lr) : '<p class="mut">Nothing below reorder level.</p>'));
+    $outHtml = '';
+    foreach ($out as $b) {
+        $outHtml .= '<li><a href="/admin/rentals?view=' . (int) $b['id'] . '">Booking #' . (int) $b['id'] . '</a>'
+            . '<br><span class="t">' . e($b['customer']) . ' · back ' . e($b['event_date']) . '</span></li>';
+    }
+    $feedHtml = '';
+    foreach ($feed as $f) {
+        $feedHtml .= '<li>' . e($f['d']) . '<br><span class="t">' . e($f['t']) . ' · ' . e($f['c']) . '</span></li>';
+    }
+    $lowHtml = '';
+    foreach ($low as $l) {
+        $lowHtml .= '<li>' . e($l['name']) . ' <span class="t">' . e((string) $l['stock_qty']) . ' left</span></li>';
+    }
+
+    layout('Staff', admin_nav()
+        . '<h1>' . $greet . ', ' . e($u['name']) . '</h1><p class="mut">' . date('l, j F Y') . ' · here is your business at a glance.</p>'
+        . '<div class="stats">'
+        . $stat((string) $open, 'open enquiries', '/admin/enquiries', $open > 0)
+        . $stat((string) ($pend['n'] ?? 0), 'payments to verify', '/admin/payments', ($pend['n'] ?? 0) > 0)
+        . $stat((string) $ret, 'rentals awaiting return', '/admin/rentals', $ret > 0)
+        . $stat(money((float) ($unpaid['t'] ?? 0)), 'owed by customers (' . (int) ($unpaid['n'] ?? 0) . ')', '/admin/invoices?f=unpaid', ($unpaid['n'] ?? 0) > 0)
+        . '</div>'
+        . '<div class="dash-grid"><div>'
+        . '<div class="panel"><h3>Today</h3><p class="stat-line"><strong>' . (int) ($today['n'] ?? 0) . ' sales</strong> · MWK '
+        . money((float) ($today['t'] ?? 0)) . ' taken</p>'
+        . '<p><a class="btn sec" href="/admin/pos">New counter sale</a> <a class="btn sec" href="/admin/orders">Orders</a></p></div>'
+        . ($opsOnly
+            ? '<div class="panel"><h3>Coming up (14 days)</h3>' . ($upHtml ? '<ul class="feed">' . $upHtml . '</ul>' : '<p class="mut">No events on the calendar.</p>') . '</div>'
+              . '<div class="panel"><h3>Equipment out</h3>' . ($outHtml ? '<ul class="feed">' . $outHtml . '</ul>' : '<p class="mut">Everything is home.</p>') . '</div>'
+            : '')
+        . '</div><div>'
+        . '<div class="panel"><h3>Latest activity</h3>' . ($feedHtml ? '<ul class="feed">' . $feedHtml . '</ul>' : '<p class="mut">Nothing yet.</p>') . '</div>'
+        . '<div class="panel"><h3>Low stock</h3>' . ($lowHtml ? '<ul class="feed">' . $lowHtml . '</ul>' : '<p class="mut">Nothing below reorder level.</p>') . '</div>'
+        . '</div></div>');
 }
 
 // ---------- Enquiries ----------

@@ -243,3 +243,31 @@ a.card { text-decoration: none; color: inherit; display: block; }
   .topbar nav { gap: .7rem; }
   .wrap { padding: 1rem .9rem 2.5rem; }
 }
+
+/* ---------- staff dashboard ---------- */
+.subnav {
+  display: flex; flex-wrap: wrap; gap: .35rem .9rem; align-items: baseline;
+  background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: .7rem 1.1rem; margin-bottom: 1.4rem; font-size: .9rem;
+}
+.subnav .grp { font-weight: 700; color: #fff; background: var(--wine); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; padding: .15rem .6rem; border-radius: var(--r-pill); }
+.subnav a { color: var(--ink); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.subnav a:hover { color: var(--rose-deep); }
+.subnav a.hot { color: var(--rose-deep); font-weight: 700; }
+.dash-grid { display: grid; grid-template-columns: 7fr 5fr; gap: 1.2rem; align-items: start; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.2rem; }
+.stat { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); padding: 1.1rem 1.2rem .8rem; box-shadow: var(--shadow-sm); }
+.stat .n { font-weight: 700; font-size: 1.9rem; color: var(--wine); line-height: 1.15; }
+.stat .n small { font-size: 1rem; color: var(--mut); font-weight: 600; }
+.stat .l { font-size: .88rem; color: var(--mut); font-weight: 600; }
+.stat p { margin: .4rem 0 .3rem; }
+.stat.alert { border-color: var(--rose); }
+.stat.alert .n { color: var(--rose-deep); }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); padding: 1.2rem 1.3rem; margin-bottom: 1.2rem; box-shadow: var(--shadow-sm); }
+.panel h3 { margin-top: 0; font-size: 1.15rem; }
+.stat-line { font-size: 1.05rem; }
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed li { padding: .55rem 0; border-bottom: 1px dashed var(--line); font-size: .93rem; }
+.feed li:last-child { border-bottom: 0; }
+.feed .t { color: var(--mut); font-size: .8rem; }
+@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
