@@ -2,10 +2,6 @@
 // Shared HTML layout — Glamorous boutique chrome.
 declare(strict_types=1);
 
-// WhatsApp chat button number in international format WITHOUT '+'.
-// TODO(go-live): replace with the real business number, e.g. '265991234567'.
-const GLAM_WHATSAPP = '';
-
 function layout(string $title, string $body, string $active = ''): void
 {
     $u = current_user();
@@ -32,11 +28,20 @@ function layout(string $title, string $body, string $active = ''): void
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
+<script>try{var _t=localStorage.getItem("glam-theme");if(_t==="dark"||(!_t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.dataset.theme="dark";}document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("theme-toggle");function icons(){var s=document.getElementById("theme-icon-sun"),m=document.getElementById("theme-icon-moon");if(s&&m){var dark=document.documentElement.dataset.theme==="dark";s.style.display=dark?"none":"";m.style.display=dark?"":"none";}}if(b){b.onclick=function(){var d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"light":"dark";try{localStorage.setItem("glam-theme",d?"light":"dark");}catch(e){}icons();};}icons();});}catch(e){}</script>
 </head>
 <body<?= $isStaff ? ' class="has-side"' : '' ?>>
 <header class="topbar">
   <?php if ($isStaff): ?><button id="side-burger" aria-label="Open menu">&#9776;</button><?php endif; ?>
   <?= $brandHtml ?>
+  <?php if ($isStaff): ?>
+  <nav class="staff-top">
+    <button id="theme-toggle" class="theme-btn icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <span id="theme-icon-sun"><?= icon('sun') ?></span><span id="theme-icon-moon" style="display:none"><?= icon('moon') ?></span>
+    </button>
+    <a class="btn sec" href="/"><?= icon('home') ?> View site</a>
+  </nav>
+  <?php else: ?>
   <nav>
     <a href="/creations/shop">Shop</a>
     <a href="/delights/cakes">Cakes</a>
@@ -52,6 +57,7 @@ function layout(string $title, string $body, string $active = ''): void
       <a href="/register" class="nav-cta">Join</a>
     <?php endif; ?>
   </nav>
+  <?php endif; ?>
 </header>
 <?php if ($isStaff && function_exists('staff_sidebar')): ?>
 <div class="staff-shell">
@@ -69,8 +75,11 @@ function layout(string $title, string $body, string $active = ''): void
   </div>
 </div>
 <?php endif; ?>
-<?php if (GLAM_WHATSAPP !== ''): ?>
-<a class="wa-float" href="https://wa.me/<?= e(GLAM_WHATSAPP) ?>?text=Hello%20Glamorous!" target="_blank" rel="noopener">Chat to order</a>
+<?php
+// WhatsApp chat button: set the number in Staff → Settings (digits, e.g. 265991234567).
+$wa = preg_replace('/\D+/', '', setting_get('whatsapp', ''));
+if ($wa !== ''): ?>
+<a class="wa-float" href="https://wa.me/<?= e($wa) ?>?text=Hello%20Glamorous!" target="_blank" rel="noopener">Chat to order</a>
 <?php endif; ?>
 <footer class="foot">
   <div class="foot-inner">

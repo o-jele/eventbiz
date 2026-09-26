@@ -388,6 +388,7 @@ CREATE TABLE IF NOT EXISTS suspended_sales (
   staff_id INT UNSIGNED NULL,
   customer_name VARCHAR(150) NULL,
   customer_phone VARCHAR(40) NULL,
+  context VARCHAR(10) NOT NULL DEFAULT 'gc',
   payload TEXT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (staff_id) REFERENCES users(id)

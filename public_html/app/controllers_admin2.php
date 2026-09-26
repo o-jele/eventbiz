@@ -279,20 +279,90 @@ function rental_ensure_invoice(int $bookingId, array $u): int
 // customer attach, tendered/change, suspend-resume, keyboard shortcuts.
 // Rebuilt here dependency-free (no jQuery/Bootstrap) in the Glamorous theme.
 const POS_ROLES = ['admin', 'accounts', 'creations_staff'];
+const POS_ROLES_BAKERY = ['admin', 'accounts', 'delights_sales', 'delights_ops'];
 
-function pos_cart(): array
+/** Register till config: Creations shop vs Delights bakery counter. */
+function pos_cfg(string $ctx): array
 {
-    return $_SESSION['pos_cart'] ?? [];
+    if ($ctx === 'gd') {
+        return [
+            'company' => GD_NAME,
+            'warehouse' => 'DELIGHTS - BAKERY - GD',
+            'roles' => POS_ROLES_BAKERY,
+            'item_where' => "published = 1 AND item_type IN ('stock','service') AND business_unit IN ('Delights','Shared')",
+            'base' => '/admin/bakery-pos',
+            'title' => 'Bakery counter',
+            'invoice_label' => 'Bakery sale #',
+        ];
+    }
+    return [
+        'company' => GC_NAME,
+        'warehouse' => 'CREATIONS - SHOP - GC',
+        'roles' => POS_ROLES,
+        'item_where' => "published = 1 AND item_type = 'stock' AND business_unit IN ('Creations','Shared')",
+        'base' => '/admin/pos',
+        'title' => 'Counter sale',
+        'invoice_label' => 'Counter sale #',
+    ];
 }
 
-function pos_save_cart(array $c): void
+/** Which till is this request for? Bakery POS routes carry the gd context. */
+function pos_ctx(): string
 {
-    $_SESSION['pos_cart'] = $c;
+    $p = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+    return str_starts_with($p, '/admin/bakery-pos') ? 'gd' : 'gc';
 }
 
-function pos_customer(): array
+/** POS request guard: returns [ctx, cfg, user]. */
+function pos_guard(): array
 {
-    return $_SESSION['pos_customer'] ?? ['name' => 'Walk-in', 'phone' => ''];
+    $ctx = pos_ctx();
+    $cfg = pos_cfg($ctx);
+    $u = require_role($cfg['roles']);
+    guard_company($cfg['company']);
+    return [$ctx, $cfg, $u];
+}
+
+function pos_base(): string
+{
+    return pos_cfg(pos_ctx())['base'];
+}
+
+function pos_cart(?string $ctx = null): array
+{
+    $ctx ??= pos_ctx();
+    $k = 'pos_cart_' . $ctx;
+    if (!isset($_SESSION[$k]) && $ctx === 'gc' && isset($_SESSION['pos_cart'])) {
+        $_SESSION[$k] = $_SESSION['pos_cart'];
+        unset($_SESSION['pos_cart']);
+    }
+    return $_SESSION[$k] ?? [];
+}
+
+function pos_save_cart(array $c, ?string $ctx = null): void
+{
+    $ctx ??= pos_ctx();
+    $_SESSION['pos_cart_' . $ctx] = $c;
+}
+
+function pos_customer(?string $ctx = null): array
+{
+    $ctx ??= pos_ctx();
+    $k = 'pos_customer_' . $ctx;
+    if (!isset($_SESSION[$k]) && $ctx === 'gc' && isset($_SESSION['pos_customer'])) {
+        $_SESSION[$k] = $_SESSION['pos_customer'];
+        unset($_SESSION['pos_customer']);
+    }
+    return $_SESSION[$k] ?? ['name' => 'Walk-in', 'phone' => ''];
+}
+
+function pos_clear(?string $ctx = null): void
+{
+    $ctx ??= pos_ctx();
+    unset($_SESSION['pos_cart_' . $ctx], $_SESSION['pos_customer_' . $ctx]);
+    if ($ctx === 'gc') {
+    pos_clear($ctx);
+    }
 }
 
 function pos_totals(array $cart): array
@@ -325,30 +395,31 @@ function pos_totals(array $cart): array
 
 function pg_admin_pos(): void
 {
-    $u = require_role(POS_ROLES);
-    guard_company(GC_NAME);
-    $cart = pos_cart();
-    $cust = pos_customer();
+    [$ctx, $cfg] = pos_guard();
+    $cart = pos_cart($ctx);
+    $cust = pos_customer($ctx);
+    $B = $cfg['base'];
     $t = pos_totals($cart);
     $suspended = db_all(
-        'SELECT s.*, u.name AS staff FROM suspended_sales s LEFT JOIN users u ON u.id = s.staff_id ORDER BY s.id DESC LIMIT 10'
+        'SELECT s.*, u.name AS staff FROM suspended_sales s LEFT JOIN users u ON u.id = s.staff_id WHERE s.context = ? ORDER BY s.id DESC LIMIT 10',
+        [$ctx]
     );
     $susHtml = '';
     foreach ($suspended as $s) {
         $susHtml .= '<li>#' . (int) $s['id'] . ' ' . e((string) ($s['customer_name'] ?: 'Walk-in'))
             . ' <span class="t">' . e((string) ($s['staff'] ?? '')) . ' · ' . e($s['created_at']) . '</span>'
-            . ' <form method="post" action="/admin/pos/resume" style="display:inline">' . csrf_field() . '
+            . ' <form method="post" action="' . $B . '/resume" style="display:inline">' . csrf_field() . '
                <input type="hidden" name="id" value="' . (int) $s['id'] . '"><button class="btn sec">Resume</button></form>'
-            . ' <form method="post" action="/admin/pos/suspend-delete" style="display:inline" onsubmit="return confirm(\'Delete this parked sale?\')">' . csrf_field() . '
+            . ' <form method="post" action="' . $B . '/suspend-delete" style="display:inline" onsubmit="return confirm(\'Delete this parked sale?\')">' . csrf_field() . '
                <input type="hidden" name="id" value="' . (int) $s['id'] . '"><button class="btn sec">Delete</button></form></li>';
     }
     $rows = '';
     foreach ($t['lines'] as $l) {
-        $rows .= '<tr><td><form method="post" action="/admin/pos/remove" style="display:inline">' . csrf_field() . '
+        $rows .= '<tr><td><form method="post" action="' . $B . '/remove" style="display:inline">' . csrf_field() . '
           <input type="hidden" name="item_id" value="' . (int) $l['id'] . '"><button class="btn sec">×</button></form></td>
           <td>' . e($l['sku']) . '<br><span class="t">stock ' . e((string) $l['stock']) . '</span></td>
           <td>' . e($l['name']) . '</td><td>' . money($l['price']) . '</td>
-          <td><form method="post" action="/admin/pos/update">' . csrf_field() . '
+          <td><form method="post" action="' . $B . '/update">' . csrf_field() . '
           <input type="hidden" name="item_id" value="' . (int) $l['id'] . '">
           <input name="qty" value="' . e((string) $l['qty']) . '" size="4" inputmode="decimal"></td>
           <td><input name="discount" value="' . e((string) $l['discount']) . '" size="4" inputmode="decimal" title="% off"></td>
@@ -358,13 +429,13 @@ function pg_admin_pos(): void
     $today = db_all(
         'SELECT o.id, o.grand_total, k.name AS customer FROM sales_orders o JOIN customers k ON k.id=o.customer_id
          WHERE o.company_id = ? AND DATE(o.created_at) = CURDATE() ORDER BY o.id DESC LIMIT 12',
-        [company_id(GC_NAME)]
+        [company_id($cfg['company'])]
     );
     $tr = [];
     foreach ($today as $x) {
         $tr[] = ['#' . $x['id'], e($x['customer']), money((float) $x['grand_total'])];
     }
-    layout('Counter sale', admin_nav() . '<h1>Counter sale ' . brand_badge(GC_NAME) . '</h1>
+    layout('Counter sale', admin_nav() . '<h1>' . e($cfg['title']) . ' ' . brand_badge($cfg['company']) . '</h1>
     <div class="pos-grid"><div>
       <div class="card"><h3>Find or scan item <span class="mut small">(Alt+1)</span></h3>
         <input id="pos-search" placeholder="Type SKU or name…" autocomplete="off">
@@ -374,14 +445,14 @@ function pg_admin_pos(): void
       <div class="card"><h3>Cart (' . count($t['lines']) . ' lines)</h3>'
       . ($rows
           ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>SKU</th><th>Item</th><th>Price</th><th>Qty</th><th>% off</th><th>Total</th><th></th></tr></thead><tbody>' . $rows . '</tbody></table></div>
-            <p><form method="post" action="/admin/pos/suspend" style="display:inline">' . csrf_field() . '<button class="btn sec">Park sale</button></form>
-            <form method="post" action="/admin/pos/cancel" style="display:inline" onsubmit="return confirm(\'Clear this sale?\')">' . csrf_field() . '<button class="btn sec">Cancel sale</button></form></p>'
+            <p><form method="post" action="' . $B . '/suspend" style="display:inline">' . csrf_field() . '<button class="btn sec">Park sale</button></form>
+            <form method="post" action="' . $B . '/cancel" style="display:inline" onsubmit="return confirm(\'Clear this sale?\')">' . csrf_field() . '<button class="btn sec">Cancel sale</button></form></p>'
           : '<p class="mut">No items yet — search above or scan.</p>')
       . '</div>'
       . ($susHtml ? '<div class="card"><h3>Parked sales</h3><ul class="feed">' . $susHtml . '</ul></div>' : '') . '
     </div><div>
       <div class="card"><h3>Customer</h3>
-        <form method="post" action="/admin/pos/customer">' . csrf_field() . '
+        <form method="post" action="' . $B . '/customer">' . csrf_field() . '
         <div class="row2">' . field('Name', '<input name="name" value="' . e($cust['name']) . '">') . field('Phone', '<input name="phone" value="' . e($cust['phone']) . '" inputmode="tel">') . '</div>
         <button class="btn sec">Attach</button></form></div>
       <div class="card pos-totals"><h3>Totals</h3>
@@ -389,7 +460,7 @@ function pg_admin_pos(): void
         . '<br>Discount: MWK ' . money($t['discount']) . '</p>
         <p class="pos-grand">MWK ' . money($t['total']) . '</p></div>
       <div class="card"><h3>Take payment</h3>
-        <form method="post" action="/admin/pos/complete">' . csrf_field() . '
+        <form method="post" action="' . $B . '/complete">' . csrf_field() . '
         ' . field('Method', '<select name="method"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Other Manual</option></select>') . '
         ' . field('Amount tendered (Alt+5)', '<input id="pos-tendered" name="tendered" inputmode="decimal" data-total="' . $t['total'] . '" value="' . $t['total'] . '">') . '
         <p>Change due: <strong id="pos-change">MWK 0.00</strong></p>
@@ -404,7 +475,7 @@ function pg_admin_pos(): void
       si.addEventListener("input", function () {
         var q = si.value.trim();
         if (q.length < 2) { box.innerHTML = ""; return; }
-        fetch("/admin/pos/suggest?q=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (d) {
+        fetch("' . $B . '/suggest?q=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (d) {
           items = d;
           box.innerHTML = d.map(function (it, i) {
             return "<button type=\'button\' data-i=\'" + i + "\'>" + esc(it.sku) + " — " + esc(it.name) + " <b>MWK " + it.price + "</b> (" + it.stock + " in stock)</button>";
@@ -441,8 +512,7 @@ function pg_admin_pos(): void
 
 function pg_pos_suggest(): void
 {
-    require_role(POS_ROLES);
-    guard_company(GC_NAME);
+    [$ctx, $cfg] = pos_guard();
     $q = '%' . trim($_GET['q'] ?? '') . '%';
     header('Content-Type: application/json');
     if (strlen(trim($_GET['q'] ?? '')) < 2) {
@@ -451,7 +521,7 @@ function pg_pos_suggest(): void
     }
     $rows = db_all(
         "SELECT id, sku, name, price, stock_qty AS stock FROM items
-         WHERE published = 1 AND item_type = 'stock' AND business_unit IN ('Creations','Shared')
+         WHERE " . $cfg['item_where'] . "
            AND (sku LIKE ? OR name LIKE ?) ORDER BY name LIMIT 8", [$q, $q]
     );
     echo json_encode($rows);
@@ -460,7 +530,7 @@ function pg_pos_suggest(): void
 
 function pg_pos_add(): void
 {
-    require_role(POS_ROLES);
+    [$ctx, $cfg] = pos_guard();
     check_csrf();
     $id = 0;
     if (!empty($_POST['item_id'])) {
@@ -470,24 +540,24 @@ function pg_pos_add(): void
         $id = $row ? (int) $row['id'] : 0;
     }
     if ($id) {
-        $it = db_one("SELECT id FROM items WHERE id = ? AND published = 1 AND item_type = 'stock'", [$id]);
+        $it = db_one("SELECT id FROM items WHERE id = ? AND " . $cfg['item_where'], [$id]);
         if ($it) {
-            $cart = pos_cart();
+            $cart = pos_cart($ctx);
             $cart[$id] = ['qty' => (float) ($cart[$id]['qty'] ?? 0) + 1, 'discount' => (float) ($cart[$id]['discount'] ?? 0)];
-            pos_save_cart($cart);
+            pos_save_cart($cart, $ctx);
         } else {
             flash('Item is not sellable here.', 'err');
         }
     }
-    redirect('/admin/pos');
+    redirect(pos_base());
 }
 
 function pg_pos_update(): void
 {
-    require_role(POS_ROLES);
+    [$ctx] = pos_guard();
     check_csrf();
     $id = (int) ($_POST['item_id'] ?? 0);
-    $cart = pos_cart();
+    $cart = pos_cart($ctx);
     if ($id && isset($cart[$id])) {
         $qty = max(0, (float) ($_POST['qty'] ?? 0));
         if ($qty <= 0) {
@@ -495,101 +565,104 @@ function pg_pos_update(): void
         } else {
             $cart[$id] = ['qty' => $qty, 'discount' => min(100, max(0, (float) ($_POST['discount'] ?? 0)))];
         }
-        pos_save_cart($cart);
+        pos_save_cart($cart, $ctx);
     }
-    redirect('/admin/pos');
+    redirect(pos_base());
 }
 
 function pg_pos_remove(): void
 {
-    require_role(POS_ROLES);
+    [$ctx] = pos_guard();
     check_csrf();
-    $cart = pos_cart();
+    $cart = pos_cart($ctx);
     unset($cart[(int) ($_POST['item_id'] ?? 0)]);
-    pos_save_cart($cart);
-    redirect('/admin/pos');
+    pos_save_cart($cart, $ctx);
+    redirect(pos_base());
 }
 
 function pg_pos_customer(): void
 {
-    require_role(POS_ROLES);
+    [$ctx] = pos_guard();
     check_csrf();
-    $_SESSION['pos_customer'] = ['name' => post('name', 'Walk-in') ?: 'Walk-in', 'phone' => post('phone')];
-    redirect('/admin/pos');
+    $_SESSION['pos_customer_' . $ctx] = ['name' => post('name', 'Walk-in') ?: 'Walk-in', 'phone' => post('phone')];
+    redirect(pos_base());
 }
 
 function pg_pos_suspend(): void
 {
-    $u = require_role(POS_ROLES);
+    [$ctx, $cfg, $u] = pos_guard();
     check_csrf();
-    $cart = pos_cart();
+    $cart = pos_cart($ctx);
     if (!$cart) {
         flash('Nothing to park.', 'err');
-        redirect('/admin/pos');
+        redirect(pos_base());
     }
-    $cust = pos_customer();
-    db_exec('INSERT INTO suspended_sales (staff_id, customer_name, customer_phone, payload) VALUES (?,?,?,?)',
-        [(int) $u['id'], $cust['name'], $cust['phone'], json_encode($cart)]);
-    unset($_SESSION['pos_cart'], $_SESSION['pos_customer']);
+    $cust = pos_customer($ctx);
+    db_exec('INSERT INTO suspended_sales (staff_id, customer_name, customer_phone, context, payload) VALUES (?,?,?,?,?)',
+        [(int) $u['id'], $cust['name'], $cust['phone'], $ctx, json_encode($cart)]);
+    pos_clear($ctx);
     flash('Sale parked (#' . db_last_id() . ').');
-    redirect('/admin/pos');
+    redirect(pos_base());
 }
 
 function pg_pos_resume(): void
 {
-    require_role(POS_ROLES);
+    [$ctx] = pos_guard();
     check_csrf();
     $s = db_one('SELECT * FROM suspended_sales WHERE id = ?', [(int) ($_POST['id'] ?? 0)]);
     if (!$s) {
-        redirect('/admin/pos');
+        redirect(pos_base());
     }
-    $_SESSION['pos_cart'] = json_decode($s['payload'], true) ?: [];
-    $_SESSION['pos_customer'] = ['name' => (string) ($s['customer_name'] ?: 'Walk-in'), 'phone' => (string) ($s['customer_phone'] ?? '')];
+    if (($s['context'] ?? 'gc') !== $ctx) {
+        flash('That parked sale belongs to the other till.', 'err');
+        redirect(pos_base());
+    }
+    $_SESSION['pos_cart_' . $ctx] = json_decode($s['payload'], true) ?: [];
+    $_SESSION['pos_customer_' . $ctx] = ['name' => (string) ($s['customer_name'] ?: 'Walk-in'), 'phone' => (string) ($s['customer_phone'] ?? '')];
     db_exec('DELETE FROM suspended_sales WHERE id = ?', [(int) $s['id']]);
     flash('Parked sale resumed.');
-    redirect('/admin/pos');
+    redirect(pos_base());
 }
 
 function pg_pos_suspend_delete(): void
 {
-    require_role(POS_ROLES);
+    pos_guard();
     check_csrf();
     db_exec('DELETE FROM suspended_sales WHERE id = ?', [(int) ($_POST['id'] ?? 0)]);
-    redirect('/admin/pos');
+    redirect(pos_base());
 }
 
 function pg_pos_cancel(): void
 {
-    require_role(POS_ROLES);
+    [$ctx] = pos_guard();
     check_csrf();
-    unset($_SESSION['pos_cart'], $_SESSION['pos_customer']);
+    pos_clear($ctx);
     flash('Sale cleared.');
-    redirect('/admin/pos');
+    redirect(pos_base());
 }
 
 function pg_pos_complete(): void
 {
-    $u = require_role(POS_ROLES);
+    [$ctx, $cfg, $u] = pos_guard();
     check_csrf();
-    $companyId = company_id(GC_NAME);
-    guard_company(GC_NAME);
-    $cart = pos_cart();
+    $companyId = company_id($cfg['company']);
+    $cart = pos_cart($ctx);
     $t = pos_totals($cart);
     if (!$t['lines']) {
         flash('Cart is empty.', 'err');
-        redirect('/admin/pos');
+        redirect(pos_base());
     }
     $tendered = (float) post('tendered', '0');
     if ($tendered < $t['total']) {
         flash('Tendered MWK ' . money($tendered) . ' is less than the MWK ' . money($t['total']) . ' total.', 'err');
-        redirect('/admin/pos');
+        redirect(pos_base());
     }
     $change = $tendered - $t['total'];
-    $cust = pos_customer();
+    $cust = pos_customer($ctx);
     $cid = $cust['phone'] !== ''
         ? find_or_create_customer($cust['name'], $cust['phone'])
         : walkin_customer_id();
-    $wh = db_one('SELECT * FROM warehouses WHERE name = ?', ['CREATIONS - SHOP - GC']);
+    $wh = db_one('SELECT * FROM warehouses WHERE name = ?', [$cfg['warehouse']]);
     db()->beginTransaction();
     try {
         db_exec(
@@ -600,14 +673,20 @@ function pg_pos_complete(): void
         $oid = db_last_id();
         foreach ($t['lines'] as $l) {
             $it = db_one('SELECT * FROM items WHERE id = ? FOR UPDATE', [$l['id']]);
-            if (!$it || (float) $it['stock_qty'] < $l['qty']) {
-                throw new RuntimeException('Insufficient stock for ' . ($it['name'] ?? ('#' . $l['id'])) . '.');
+            if (!$it) {
+                throw new RuntimeException('Unknown item #' . $l['id'] . '.');
+            }
+            // Services (fresh bakery etc.) are produced to order — no stock check.
+            if ($it['item_type'] === 'stock' && (float) $it['stock_qty'] < $l['qty']) {
+                throw new RuntimeException('Insufficient stock for ' . $it['name'] . '.');
             }
             db_exec('INSERT INTO sales_order_items (order_id, item_id, description, qty, rate, discount_pct, amount) VALUES (?,?,?,?,?,?,?)',
                 [$oid, $l['id'], $l['name'], $l['qty'], $l['price'], $l['discount'], $l['amount']]);
-            post_stock($l['id'], (int) $wh['id'], -$l['qty'], 'sales_order', $oid, 'Counter sale');
+            if ($it['item_type'] === 'stock') {
+                post_stock($l['id'], (int) $wh['id'], -$l['qty'], 'sales_order', $oid, 'Counter sale');
+            }
         }
-        $inv = make_invoice($companyId, $cid, $oid, 'Counter sale #' . $oid, $t['total']);
+            $inv = make_invoice($companyId, $cid, $oid, $cfg['invoice_label'] . $oid, $t['total']);
         db_exec(
             "INSERT INTO payments (company_id, customer_id, invoice_id, kind, amount, method, reference, payment_date, received_by)
              VALUES (?,?,?, 'invoice', ?,?,?,?,?)",
@@ -618,7 +697,7 @@ function pg_pos_complete(): void
     } catch (Throwable $ex) {
         db()->rollBack();
         flash($ex->getMessage(), 'err');
-        redirect('/admin/pos');
+        redirect(pos_base());
     }
     unset($_SESSION['pos_cart'], $_SESSION['pos_customer']);
     flash('Sale #' . $oid . ' complete — invoice #' . $inv . '. Change due: MWK ' . money($change) . '.');
@@ -888,5 +967,128 @@ function pg_admin_invoices(): void
     }
     layout('Invoices', admin_nav() . '<h1>Invoices</h1>
       <p class="mut">Filter: <a href="/admin/invoices">all</a> · <a href="/admin/invoices?f=unpaid">unpaid only</a></p>' .
-        ($tr ? table(['Brand', 'Invoice', 'Customer', 'Total', 'Paid', 'Balance', 'Status'], $tr) : '<p class="mut">No invoices.</p>'));
+        ($tr ? table(['Brand', '#', 'Customer', 'Total', 'Paid', 'Balance', 'Status'], $tr) : '<p class="mut">No invoices.</p>'));
+}
+
+// ---------- Settings (admin only) ----------
+function pg_admin_settings(): void
+{
+    require_role(['admin']);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        check_csrf();
+        setting_set('site_name', post('site_name', 'Glamorous'));
+        setting_set('whatsapp', preg_replace('/\D+/', '', post('whatsapp')));
+        flash('Settings saved.');
+        redirect('/admin/settings');
+    }
+    layout('Settings', admin_nav() . '<h1>Settings</h1><div class="card"><form method="post">' . csrf_field() . '
+      ' . field('Site name', '<input name="site_name" value="' . e(setting_get('site_name', 'Glamorous')) . '">') . '
+      ' . field('WhatsApp number (international digits, e.g. 265991234567 — enables the chat button)', '<input name="whatsapp" value="' . e(setting_get('whatsapp', '')) . '" inputmode="numeric">') . '
+      <button class="btn">Save</button></form></div>
+      <p class="mut">Currency is MWK and fixed at install — changing it later needs accountant review.</p>');
+}
+
+// ---------- All quotations ----------
+function pg_admin_quotations(): void
+{
+    require_role(['admin', 'accounts', 'delights_sales']);
+    $f = get_param('f');
+    $sql = 'SELECT q.*, v.name AS event, k.name AS customer, c.name AS company FROM quotations q
+            JOIN events v ON v.id = q.event_id JOIN customers k ON k.id = q.customer_id
+            JOIN companies c ON c.id = q.company_id'
+        . ($f !== '' ? ' WHERE q.status = ?' : '') . ' ORDER BY q.id DESC LIMIT 100';
+    $rows = $f !== '' ? db_all($sql, [$f]) : db_all($sql);
+    $tr = [];
+    foreach ($rows as $r) {
+        $tr[] = [brand_badge($r['company']),
+                 '<a href="/admin/events?view=' . (int) $r['event_id'] . '">#' . (int) $r['id'] . ' ' . e($r['event']) . '</a>',
+                 e($r['customer']), money((float) $r['grand_total']), money((float) $r['deposit_required']), e($r['status'])];
+    }
+    layout('Quotations', admin_nav() . '<h1>Quotations</h1>
+      <p class="mut">Filter: <a href="/admin/quotations">all</a> · <a href="/admin/quotations?f=Draft">draft</a> · <a href="/admin/quotations?f=Sent">sent</a> · <a href="/admin/quotations?f=Approved">approved</a> · <a href="/admin/quotations?f=Converted">converted</a></p>' .
+        ($tr ? table(['Brand', 'Quotation', 'Customer', 'Total', 'Deposit', 'Status'], $tr) : '<p class="mut">No quotations. Create one from an event.</p>'));
+}
+
+// ---------- Warehouse balances + internal moves ----------
+function pg_admin_warehouse(): void
+{
+    $u = require_role(['admin', 'accounts', 'creations_staff', 'delights_ops']);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        check_csrf();
+        $from = db_one('SELECT w.*, c.name AS company FROM warehouses w JOIN companies c ON c.id = w.company_id WHERE w.id = ? AND w.is_group = 0', [(int) post('from_warehouse')]);
+        $to = db_one('SELECT w.*, c.name AS company FROM warehouses w JOIN companies c ON c.id = w.company_id WHERE w.id = ? AND w.is_group = 0', [(int) post('to_warehouse')]);
+        $it = db_one('SELECT * FROM items WHERE id = ?', [(int) post('item_id')]);
+        $qty = (float) post('qty', '0');
+        if (!$from || !$to || !$it) {
+            exit('Pick source, destination and item.');
+        }
+        guard_company(company_name((int) $from['company_id']));
+        guard_company(company_name((int) $to['company_id']));
+        if ((int) $from['company_id'] !== (int) $to['company_id']) {
+            flash('Cross-company move — use Transfers instead.', 'err');
+            redirect('/admin/warehouse');
+        }
+        if ((int) $from['id'] === (int) $to['id']) {
+            flash('Source and destination are the same.', 'err');
+            redirect('/admin/warehouse');
+        }
+        if ($qty <= 0) {
+            flash('Quantity must be above zero.', 'err');
+            redirect('/admin/warehouse');
+        }
+        $have = warehouse_balance((int) $it['id'], (int) $from['id']);
+        if ($have < $qty) {
+            flash('Only ' . $have . ' × ' . $it['name'] . ' in ' . $from['name'] . '.', 'err');
+            redirect('/admin/warehouse');
+        }
+        db()->beginTransaction();
+        db_exec('INSERT INTO stock_moves (item_id, warehouse_id, qty_change, ref_type, notes, created_by) VALUES (?,?,?,?,?,?)',
+            [(int) $it['id'], (int) $from['id'], -$qty, 'move', 'Internal move out', (int) $u['id']]);
+        db_exec('INSERT INTO stock_moves (item_id, warehouse_id, qty_change, ref_type, notes, created_by) VALUES (?,?,?,?,?,?)',
+            [(int) $it['id'], (int) $to['id'], $qty, 'move', 'Internal move in', (int) $u['id']]);
+        db()->commit();
+        flash('Moved ' . $qty . ' × ' . $it['name'] . ' → ' . $to['name'] . '.');
+        redirect('/admin/warehouse?w=' . (int) $to['id']);
+    }
+    $whs = db_all('SELECT w.id, w.name, c.name AS company FROM warehouses w JOIN companies c ON c.id = w.company_id WHERE w.is_group = 0 ORDER BY w.name');
+    $w = (int) get_param('w') ?: (int) ($whs[0]['id'] ?? 0);
+    $whopts = '';
+    foreach ($whs as $x) {
+        $whopts .= '<option value="' . (int) $x['id'] . '"' . ($w === (int) $x['id'] ? ' selected' : '') . '>' . e($x['name']) . '</option>';
+    }
+    $bal = [];
+    if ($w) {
+        foreach (db_all('SELECT item_id, COALESCE(SUM(qty_change),0) AS b FROM stock_moves WHERE warehouse_id = ? GROUP BY item_id', [$w]) as $r) {
+            $bal[(int) $r['item_id']] = (float) $r['b'];
+        }
+    }
+    $items = db_all("SELECT id, sku, name, stock_qty FROM items WHERE item_type IN ('stock','rental') ORDER BY name");
+    $tr = [];
+    $iopts = '';
+    foreach ($items as $i) {
+        $b = $bal[(int) $i['id']] ?? 0;
+        if ($w && $b == 0 && (float) $i['stock_qty'] == 0) {
+            continue;
+        }
+        $tr[] = [e($i['sku']), e($i['name']), e((string) $b), e((string) $i['stock_qty'])];
+        $iopts .= '<option value="' . (int) $i['id'] . '">' . e($i['name']) . '</option>';
+    }
+    $moves = db_all(
+        "SELECT m.*, i.sku, f.name AS fw FROM stock_moves m
+         JOIN items i ON i.id = m.item_id JOIN warehouses f ON f.id = m.warehouse_id
+         WHERE m.ref_type IN ('move','adjustment') ORDER BY m.id DESC LIMIT 20"
+    );
+    $mr = [];
+    foreach ($moves as $m) {
+        $mr[] = [e($m['created_at']), e($m['sku']), e($m['qty_change']), e($m['fw']), e($m['ref_type']) . ' ' . e((string) ($m['notes'] ?? ''))];
+    }
+    layout('Warehouse', admin_nav() . '<h1>Warehouse</h1>
+      <div class="card"><form method="get" action="/admin/warehouse"><label class="fld"><span>Warehouse</span>
+      <select name="w" onchange="this.form.submit()">' . $whopts . '</select></label></form>
+      ' . ($tr ? table(['SKU', 'Item', 'Here', 'Global'], $tr) : '<p class="mut">Nothing stocked here.</p>') . '</div>
+      <h2>Move stock (same company)</h2><div class="card"><form method="post">' . csrf_field() . '
+      <div class="row2">' . field('From', '<select name="from_warehouse">' . $whopts . '</select>') . field('To', '<select name="to_warehouse">' . $whopts . '</select>') . '</div>
+      <div class="row2">' . field('Item', '<select name="item_id">' . $iopts . '</select>') . field('Qty', '<input name="qty">') . '</div>
+      <button class="btn">Move</button></form></div>
+      <h2>Recent moves</h2>' . ($mr ? table(['When', 'SKU', 'Qty', 'Warehouse', 'Ref'], $mr) : '<p class="mut">None.</p>'));
 }

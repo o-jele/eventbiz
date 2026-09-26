@@ -7,12 +7,16 @@ function staff_sidebar(): string
 {
     $u = current_user();
     $groups = [
-        'Desk' => [['/admin', 'Dashboard'], ['/admin/enquiries', 'Enquiries'], ['/admin/events', 'Events'],
-                   ['/admin/bakery', 'Bakery'], ['/admin/catering', 'Catering'], ['/admin/rentals', 'Rentals']],
-        'Money' => [['/admin/payments', 'Payments'], ['/admin/orders', 'Orders'], ['/admin/invoices', 'Invoices'],
-                    ['/admin/pos', 'Counter sale']],
-        'Stock' => [['/admin/items', 'Items'], ['/admin/purchases', 'Purchasing'], ['/admin/transfers', 'Transfers']],
-        'Setup' => [['/admin/users', 'Users'], ['/admin/reports', 'Reports']],
+        'Desk' => [['/admin', 'Dashboards', 'dashboard'], ['/admin/enquiries', 'Enquiries', 'enquiries'],
+                   ['/admin/pos', 'Creations POS', 'pos'], ['/admin/bakery-pos', 'Bakery POS', 'bakery'],
+                   ['/admin/events', 'Events', 'events'], ['/admin/catering', 'Catering', 'catering'],
+                   ['/admin/rentals', 'Rentals', 'rentals']],
+        'Money' => [['/admin/payments', 'Payments', 'payments'], ['/admin/orders', 'Orders', 'orders'],
+                    ['/admin/quotations', 'Quotations', 'quotations'], ['/admin/invoices', 'Invoices', 'invoices']],
+        'Stock' => [['/admin/items', 'Items', 'items'], ['/admin/purchases', 'Purchasing', 'purchasing'],
+                    ['/admin/transfers', 'Transfers', 'transfers'], ['/admin/warehouse', 'Warehouse', 'warehouse']],
+        'Setup' => [['/admin/users', 'Users', 'users'], ['/admin/reports', 'Reports', 'reports'],
+                    ['/admin/settings', 'Settings', 'settings']],
     ];
     $open = (int) (db_one("SELECT COUNT(*) AS c FROM enquiries WHERE status = 'Open'")['c'] ?? 0);
     $pend = (int) (db_one("SELECT COUNT(*) AS c FROM payment_declarations WHERE status IN ('Submitted','Pending Verification')")['c'] ?? 0);
@@ -22,24 +26,24 @@ function staff_sidebar(): string
     foreach ($groups as $g => $links) {
         $h .= '<div class="side-grp"><span>' . $g . '</span>';
         foreach ($links as $link) {
-            [$url, $label] = $link;
+            [$url, $label, $ic] = $link;
             $n = $hot[$url] ?? 0;
             $active = ($here === $url || ($url !== '/admin' && str_starts_with($here, $url . '/'))) ? ' on' : '';
-            $h .= '<a href="' . $url . '" class="side-link' . ($n ? ' hot' : '') . $active . '">' . $label . ($n ? ' <b>(' . $n . ')</b>' : '') . '</a>';
+            $h .= '<a href="' . $url . '" class="side-link' . ($n ? ' hot' : '') . $active . '">'
+                . '<span class="ico">' . icon($ic) . '</span><span class="lbl">' . $label . ($n ? ' <b>(' . $n . ')</b>' : '') . '</span></a>';
         }
         $h .= '</div>';
     }
     $name = $u ? $u['name'] : 'Staff';
     $role = $u ? ucwords(str_replace('_', ' ', $u['role'])) : '';
+    $words = array_slice(explode(' ', $name), 0, 2);
+    $initials = strtoupper(implode('', array_map(fn($w) => mb_substr($w, 0, 1), $words)));
     $h .= '<div class="side-foot">'
-        . '<div class="side-user"><span class="avatar-lg sm">' . e(strtoupper(mb_substr($name, 0, 1))) . '</span>'
-        . '<span class="who"><strong>' . e($name) . '</strong><small>' . e($role) . '</small></span></div>'
-        . '<div class="side-row"><button id="theme-toggle" class="theme-btn" title="Toggle dark mode">◐</button>'
-        . '<button id="side-collapse" class="theme-btn" title="Collapse sidebar">⇤</button></div>'
+        . '<div class="side-user"><span class="avatar-lg sm">' . e($initials) . '</span>'
+        . '<span class="who"><strong>(' . e($initials) . ') ' . e($name) . ' <a href="/logout">[logout]</a></strong><small>' . e($role) . '</small></span></div>'
+        . '<div class="side-row"><button id="side-collapse" class="theme-btn" title="Collapse sidebar">⇤</button></div>'
         . '</div>';
     $h .= '<script>(function(){try{'
-        . 'var t=localStorage.getItem("glam-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.dataset.theme="dark";}'
-        . 'document.getElementById("theme-toggle").onclick=function(){var d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"light":"dark";localStorage.setItem("glam-theme",d?"light":"dark");};'
         . 'if(localStorage.getItem("glam-side")==="mini"){document.body.classList.add("side-mini");}'
         . 'document.getElementById("side-collapse").onclick=function(){document.body.classList.toggle("side-mini");localStorage.setItem("glam-side",document.body.classList.contains("side-mini")?"mini":"full");};'
         . 'var b=document.getElementById("side-burger");if(b){b.onclick=function(){document.body.classList.toggle("side-open");};}'
