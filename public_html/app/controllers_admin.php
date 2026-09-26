@@ -420,8 +420,8 @@ function pg_admin(): void
               . '<h4>Customers (30d)</h4><ul class="feed">' . ($topCustHtml ?: '<li class="mut">No sales yet.</li>') . '</ul></div>'
             : '')
         . '</div><div>'
-        . '<div class="panel"><h3>Latest activity</h3><div class="tabs">' . $tabs . '</div>' . ($feedHtml ?: '<p class="mut">Nothing yet.</p>') . '</div>'
         . '<div class="panel"><h3>Birthdays this week</h3>' . ($bdayHtml ? '<ul class="feed">' . $bdayHtml . '</ul>' : '<p class="mut">No birthdays coming up. Capture birth dates on the Customers page.</p>') . '</div>'
+        . '<div class="panel"><h3>Latest activity</h3><div class="tabs">' . $tabs . '</div>' . ($feedHtml ?: '<p class="mut">Nothing yet.</p>') . '</div>'
         . '<div class="panel"><h3>Inventory alerts</h3>' . ($invHtml ? '<ul class="feed">' . $invHtml . '</ul>' : '<p class="mut">Stock levels healthy.</p>') . '</div>'
         . '</div></div>'
         . '<script>(function(){function fmt(v,dec){return Number(v).toLocaleString("en-US",{minimumFractionDigits:dec,maximumFractionDigits:dec});}'

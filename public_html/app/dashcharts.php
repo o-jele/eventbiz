@@ -54,6 +54,15 @@ function svg_bars(array $buckets): string
     $max = max(1, max(array_column($buckets, 'value')));
     $slot = ($w - 16) / $n;
     $bw = max(5, $slot - 7);
+    $fmt = function ($v) {
+        if ($v >= 1000000) {
+            return round($v / 1000000, 1) . 'M';
+        }
+        if ($v >= 1000) {
+            return round($v / 1000) . 'k';
+        }
+        return (string) (int) $v;
+    };
     $s = '';
     foreach ($buckets as $i => $b) {
         $bh = ($b['value'] / $max) * ($h - $padB - 26);
@@ -61,6 +70,9 @@ function svg_bars(array $buckets): string
         $y = $h - $padB - $bh;
         $s .= '<rect x="' . round($x, 1) . '" y="' . round($y, 1) . '" width="' . round($bw, 1) . '" height="' . round(max(0, $bh), 1)
             . '" rx="4" fill="#DE7FB8"><title>' . e($b['label']) . ': MK' . number_format((float) $b['value']) . '</title></rect>';
+        if ($b['value'] > 0) {
+            $s .= '<text x="' . round($x + $bw / 2, 1) . '" y="' . round(max(14, $y - 5), 1) . '" font-size="9" font-weight="700" fill="#A34866" text-anchor="middle">' . $fmt((float) $b['value']) . '</text>';
+        }
     }
     $labels = '';
     foreach ($buckets as $i => $b) {
