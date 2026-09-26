@@ -9,6 +9,7 @@ require __DIR__ . '/app/views_layout.php';
 require __DIR__ . '/app/controllers_public.php';
 require __DIR__ . '/app/controllers_portal.php';
 require __DIR__ . '/app/controllers_admin.php';
+require __DIR__ . '/app/controllers_admin2.php';
 
 if (!empty($config['__missing'])) {
     http_response_code(500);
@@ -44,6 +45,11 @@ $routes = [
     '/my-glamorous' => 'pg_portal',
     '/declare' => 'pg_declare',
     '/admin' => 'pg_admin',
+    '/admin/bakery' => 'pg_admin_bakery',
+    '/admin/catering' => 'pg_admin_catering',
+    '/admin/pos' => 'pg_admin_pos',
+    '/admin/purchases' => 'pg_admin_purchases',
+    '/password' => 'pg_password',
     '/admin/enquiries' => 'pg_admin_enquiries',
     '/admin/events' => 'pg_admin_events',
     '/admin/rentals' => 'pg_admin_rentals',

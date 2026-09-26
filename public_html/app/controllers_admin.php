@@ -6,8 +6,10 @@ declare(strict_types=1);
 function admin_nav(): string
 {
     return '<p><a href="/admin">Dashboard</a> · <a href="/admin/enquiries">Enquiries</a> ·
-      <a href="/admin/events">Events</a> · <a href="/admin/rentals">Rentals</a> ·
+      <a href="/admin/events">Events</a> · <a href="/admin/bakery">Bakery</a> ·
+      <a href="/admin/catering">Catering</a> · <a href="/admin/rentals">Rentals</a> ·
       <a href="/admin/payments">Payments</a> · <a href="/admin/orders">Orders</a> ·
+      <a href="/admin/pos">Counter sale</a> · <a href="/admin/purchases">Purchasing</a> ·
       <a href="/admin/items">Items</a> · <a href="/admin/users">Users</a> ·
       <a href="/admin/reports">Reports</a></p>';
 }
@@ -184,9 +186,10 @@ function pg_admin_event_view(int $id): void
         flash('Quotation #' . $qid . ' created. Total MWK ' . money($sub) . '.');
         redirect('/admin/events?view=' . $id);
     }
-    // Convert quotation → sales order + invoice + rental/catering/cake docs.
-    if (($_GET['convert'] ?? '') !== '') {
-        pg_admin_quotation_convert($ev, (int) $_GET['convert'], $u);
+    // Convert quotation → sales order + invoice + rental/catering/cake docs (POST only).
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_qid'])) {
+        check_csrf();
+        pg_admin_quotation_convert($ev, (int) $_POST['convert_qid'], $u);
         return;
     }
     if (($_GET['quote'] ?? '') === '1') {
@@ -212,7 +215,9 @@ function pg_admin_event_view(int $id): void
     foreach ($quotes as $q) {
         $qr[] = ['#' . $q['id'], money((float) $q['grand_total']), money((float) $q['deposit_required']),
                  e($q['status']), $q['status'] === 'Sent'
-                    ? '<a href="/admin/events?view=' . $id . '&convert=' . (int) $q['id'] . '">Convert to order</a>' : ''];
+                    ? '<form method="post" style="display:inline">' . csrf_field() . '
+                       <input type="hidden" name="convert_qid" value="' . (int) $q['id'] . '">
+                       <button class="btn sec">Convert to order</button></form>' : ''];
     }
     $rentals = db_all('SELECT * FROM rental_bookings WHERE event_id = ? ORDER BY id', [$id]);
     $rr = [];
@@ -316,6 +321,10 @@ function pg_admin_rentals(): void
         pg_admin_rental_view((int) $_GET['view'], $u);
         return;
     }
+    if (($_GET['new'] ?? '') === '1') {
+        pg_admin_rental_new();
+        return;
+    }
     $rows = db_all(
         'SELECT b.*, c.name AS company, k.name AS customer FROM rental_bookings b
          JOIN companies c ON c.id=b.company_id JOIN customers k ON k.id=b.customer_id
@@ -328,7 +337,7 @@ function pg_admin_rentals(): void
                  e($r['customer']), e($r['event_date']) . ' → ' . e($r['return_expected']),
                  money((float) $r['grand_total']), e($r['status'])];
     }
-    layout('Rentals', admin_nav() . '<h1>Rental bookings</h1>' .
+    layout('Rentals', admin_nav() . '<h1>Rental bookings</h1><p><a class="btn" href="/admin/rentals?new=1">New booking</a></p>' .
         ($tr ? table(['Brand', '#', 'Customer', 'Use → return', 'Total', 'Status'], $tr) : '<p class="mut">No bookings.</p>'));
 }
 
@@ -344,7 +353,8 @@ function pg_admin_rental_view(int $id, array $u): void
     $items = db_all('SELECT i.*, t.name AS item_name FROM rental_booking_items i JOIN items t ON t.id=i.item_id WHERE i.booking_id = ?', [$id]);
     // Status moves.
     foreach (['Confirmed' => ['Deposit Pending', 'Quoted'], 'Dispatched' => ['Confirmed'],
-              'At Customer' => ['Dispatched'], 'Return Due' => ['At Customer']] as $to => $froms) {
+              'At Customer' => ['Dispatched'], 'Return Due' => ['At Customer'],
+              'Cancelled' => ['Quoted', 'Deposit Pending']] as $to => $froms) {
         if (($_GET['set'] ?? '') === $to && in_array($b['status'], $froms, true)) {
             if ($to === 'Confirmed') {
                 foreach ($items as $it) {
@@ -359,6 +369,12 @@ function pg_admin_rental_view(int $id, array $u): void
             flash('Booking #' . $id . ' → ' . $to . '.');
             redirect('/admin/rentals?view=' . $id);
         }
+    }
+    // Standalone invoice for bookings not covered by an event invoice.
+    if (($_GET['invoice'] ?? '') === '1') {
+        $invId = rental_ensure_invoice($id, $u);
+        flash('Invoice #' . $invId . ' ready.');
+        redirect('/admin/rentals?view=' . $id);
     }
     // Return form.
     if (($_GET['return'] ?? '') === '1') {
@@ -457,7 +473,7 @@ function pg_admin_rental_view(int $id, array $u): void
     layout('Booking #' . $id, admin_nav() . '<h1>Booking #' . $id . ' ' . brand_badge($b['company']) . '</h1>
       <p class="mut">' . e($b['customer']) . ' · ' . e($b['event_date']) . ' → ' . e($b['return_expected']) . ' · '
       . e($b['status']) . ' · deposit ' . money((float) $b['deposit_received']) . '/' . money((float) $b['deposit_required']) . '</p>
-      <p>' . $actions . ' <a class="btn" href="/admin/rentals?view=' . $id . '&return=1">Record return</a></p>
+      <p>' . $actions . ' <a class="btn sec" href="/admin/rentals?view=' . $id . '&invoice=1">Create invoice</a> <a class="btn" href="/admin/rentals?view=' . $id . '&return=1">Record return</a></p>
       <h2>Items</h2>' . table(['Item', 'Qty', 'Rate', 'Amount'], $ir) . '
       <h2>Returns</h2>' . ($rr ? table(['#', 'Date', 'Refund', 'Status'], $rr) : '<p class="mut">None.</p>'));
 }

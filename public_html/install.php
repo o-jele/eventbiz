@@ -49,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_dir(__DIR__ . '/uploads')) {
             mkdir(__DIR__ . '/uploads', 0755, true);
         }
+        file_put_contents(__DIR__ . '/uploads/index.html', 'Not browsable.');
         echo '<h1>Installed.</h1><p><strong>Delete install.php now</strong> (and this message), then <a href="/login">log in</a>.</p>';
         exit;
     } catch (Throwable $ex) {

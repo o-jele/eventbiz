@@ -27,6 +27,7 @@ function layout(string $title, string $body, string $active = ''): void
     <a href="/delights/catering">Catering</a>
     <?php if ($u): ?>
       <a href="/my-glamorous">My Glamorous</a>
+      <a href="/password">Account</a>
       <?php if ($isStaff): ?><a href="/admin"><strong>Staff</strong></a><?php endif; ?>
       <a href="/logout">Logout (<?= e($u['name']) ?>)</a>
     <?php else: ?>

@@ -2,7 +2,9 @@
 // Shared domain logic: stock ledger, rental availability, deposits, invoicing.
 declare(strict_types=1);
 
-const RENTAL_ACTIVE = ['Confirmed', 'Dispatched', 'At Customer', 'Return Due'];
+// Pending bookings hold stock too (released on Cancelled); otherwise two
+// overlapping quotations could sell the same chairs twice (SPEC T5).
+const RENTAL_ACTIVE = ['Quoted', 'Deposit Pending', 'Confirmed', 'Dispatched', 'At Customer', 'Return Due'];
 
 /** Adjust cached stock + append ledger row. Throws on cross-company move. */
 function post_stock(int $itemId, int $warehouseId, float $qtyChange, ?string $refType, ?int $refId, ?string $notes = null): void
