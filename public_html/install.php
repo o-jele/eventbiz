@@ -13,6 +13,7 @@ if (is_file($cfgFile)) {
 $err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $host = trim($_POST['db_host'] ?? 'localhost');
+    $port = (int) (trim($_POST['db_port'] ?? '') ?: 3306);
     $name = trim($_POST['db_name'] ?? '');
     $user = trim($_POST['db_user'] ?? '');
     $pass = (string) ($_POST['db_pass'] ?? '');
@@ -23,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($name === '' || $user === '' || $adminName === '' || $adminEmail === '' || strlen($adminPass) < 8) {
             throw new RuntimeException('Fill every field; admin password must be 8+ characters.');
         }
-        $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $pdo = new PDO("mysql:host=$host;port=$port;charset=utf8mb4", $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $pdo->exec("CREATE DATABASE IF NOT EXISTS `$name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         $pdo->exec("USE `$name`");
         foreach (['schema.sql', 'seed.sql'] as $f) {
@@ -40,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $st->execute([$adminName, $adminEmail, password_hash($adminPass, PASSWORD_DEFAULT), 'admin', $cid]);
         $cfg = "<?php\nreturn [\n"
             . "    'db_host' => " . var_export($host, true) . ",\n"
+            . "    'db_port' => " . $port . ",\n"
             . "    'db_name' => " . var_export($name, true) . ",\n"
             . "    'db_user' => " . var_export($user, true) . ",\n"
             . "    'db_pass' => " . var_export($pass, true) . ",\n"
@@ -62,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <p>Needs: PHP 8.1+, MySQL/MariaDB, a database + user (create them in HestiaCP first).</p>
 <?php if ($err): ?><p style="color:red"><?= htmlspecialchars($err) ?></p><?php endif; ?>
 <form method="post">
-<p>DB host <input name="db_host" value="localhost"></p>
+<p>DB host <input name="db_host" value="localhost"> port <input name="db_port" value="3306" size="6"></p>
 <p>DB name <input name="db_name" required></p>
 <p>DB user <input name="db_user" required></p>
 <p>DB password <input name="db_pass" type="password"></p>
