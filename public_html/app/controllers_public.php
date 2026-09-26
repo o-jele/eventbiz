@@ -5,30 +5,83 @@ declare(strict_types=1);
 function pg_home(): void
 {
     layout('Welcome', '
+    <section class="hero-band">
+      <span class="hero-kicker">Lilongwe · Malawi</span>
+      <h1>Bakes, cakes &amp; celebrations, beautifully done.</h1>
+      <p class="lead">Stock your kitchen at <strong>Glamorous Creations</strong> — or let <strong>Glamorous Delights</strong> handle your wedding, party or corporate event, from cake to catering to chairs.</p>
+      <div class="hero-cta">
+        <a class="btn" href="/creations/shop">Shop supplies</a>
+        <a class="btn gold" href="/delights/request">Plan an event</a>
+      </div>
+    </section>
     <div class="hero">
-      <div class="card"><h2>Glamorous Creations</h2>
-        <p>Baking supplies, tools &amp; packaging. Buy online, pick up or get delivery.</p>
-        <p><a class="btn" href="/creations/shop">Shop supplies</a></p></div>
-      <div class="card"><h2>Glamorous Delights</h2>
-        <p>Wedding cakes, catering, equipment rental &amp; full events.</p>
-        <p><a class="btn" href="/delights">Plan an event</a></p></div>
-    </div>');
+      <a class="cat-card" href="/creations/shop"><h3>Glamorous Creations</h3>
+        <p>Flour, flavours, tools &amp; packaging for home bakers and businesses. Order online — pickup or arranged delivery.</p>
+        <p><strong>Browse the shop →</strong></p></a>
+      <a class="cat-card" href="/delights"><h3>Glamorous Delights</h3>
+        <p>Wedding &amp; custom cakes, catering, equipment rental and full event styling. Tell us your date — we send a quotation.</p>
+        <p><strong>Explore celebrations →</strong></p></a>
+    </div>
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step"><h3>Browse or request</h3><p>Shop supplies instantly, or send a cake, catering or rental request with your event date.</p></div>
+      <div class="step"><h3>We confirm</h3><p>Pay cash, bank transfer or mobile money. Our team verifies every payment personally.</p></div>
+      <div class="step"><h3>Celebrate</h3><p>Pickup or arranged delivery — with our crew on-site for full events.</p></div>
+    </div>
+    <div class="trust"><span>Pickup available</span><span>Delivery arranged</span><span>Mobile money accepted</span><span>Custom orders welcome</span></div>');
+}
+
+function delights_from(string $group): string
+{
+    $row = db_one(
+        'SELECT MIN(i.price) AS m FROM items i JOIN item_groups g ON g.id = i.item_group_id
+         WHERE g.name = ? AND i.published = 1 AND i.price > 0', [$group]
+    );
+    return ($row && (float) $row['m'] > 0) ? 'from MWK ' . money((float) $row['m']) : 'on quotation';
 }
 
 function pg_creations(): void
 {
-    $items = db_all(
-        "SELECT i.* FROM items i WHERE i.published = 1 AND i.business_unit IN ('Creations','Shared')
-         AND i.item_type = 'stock' ORDER BY i.featured DESC, i.name LIMIT 24"
+    $groups = db_all(
+        "SELECT g.id, g.name, COUNT(i.id) AS n FROM item_groups g
+         LEFT JOIN items i ON i.item_group_id = g.id AND i.published = 1 AND i.item_type = 'stock'
+           AND i.business_unit IN ('Creations','Shared')
+         WHERE g.name IN ('Baking Ingredients','Baking Tools & Equipment','Packaging')
+         GROUP BY g.id ORDER BY g.name"
     );
+    $g = (int) get_param('g');
+    $sql = "SELECT i.* FROM items i WHERE i.published = 1 AND i.business_unit IN ('Creations','Shared') AND i.item_type = 'stock'";
+    $params = [];
+    if ($g) {
+        $sql .= ' AND i.item_group_id = ?';
+        $params[] = $g;
+    }
+    $sql .= ' ORDER BY i.featured DESC, i.name LIMIT 48';
+    $items = db_all($sql, $params);
+    $chips = '<a href="/creations/shop" class="' . ($g ? '' : 'on') . '">Everything</a>';
+    foreach ($groups as $gg) {
+        $chips .= '<a href="/creations/shop?g=' . (int) $gg['id'] . '" class="' . ($g === (int) $gg['id'] ? 'on' : '') . '">'
+            . e($gg['name']) . ' (' . (int) $gg['n'] . ')</a>';
+    }
     $cards = '';
     foreach ($items as $it) {
-        $cards .= '<div class="card">' . item_img($it['image_path'] ?? null, $it['name']) . '<h3>' . e($it['name']) . '</h3>
-          <p class="mut">' . e($it['sku']) . ' · Stock: ' . e((string) $it['stock_qty']) . '</p>
-          <p><strong>MWK ' . money((float) $it['price']) . '</strong></p>
+        $stock = (float) $it['stock_qty'];
+        $pill = $stock <= 0
+            ? '<span class="stock-pill stock-out">Out of stock</span>'
+            : (((float) $it['reorder_level'] > 0 && $stock <= (float) $it['reorder_level'])
+                ? '<span class="stock-pill stock-low">Low stock</span>'
+                : '<span class="stock-pill stock-ok">In stock</span>');
+        $cards .= '<div class="card">' . item_img($it['image_path'] ?? null, $it['name'])
+            . '<h3>' . e($it['name']) . '</h3>
+          <p class="mut">' . e($it['sku']) . '</p>
+          <p class="price">MWK ' . money((float) $it['price']) . '</p>
+          <p>' . $pill . '</p>
           <p><a class="btn" href="/product/' . (int) $it['id'] . '">View</a></p></div>';
     }
-    layout('Creations', '<h1>Glamorous Creations</h1><div class="grid">' . ($cards ?: '<p>No products published yet.</p>') . '</div>');
+    layout('Creations', '<h1>Baking supplies shop</h1>
+      <p class="mut">Everything for home bakers &amp; baking businesses — flour to cake boxes. Pickup or arranged delivery.</p>
+      <div class="chips">' . $chips . '</div>
+      <div class="grid">' . ($cards ?: '<p>No products in this category yet.</p>') . '</div>');
 }
 
 function pg_product(int $id): void
@@ -38,15 +91,26 @@ function pg_product(int $id): void
         http_response_code(404);
         exit('Product not found.');
     }
-    layout($it['name'], '
-    <div class="card">' . item_img($it['image_path'] ?? null, $it['name']) . '<h1>' . e($it['name']) . '</h1>
-    <p class="mut">' . e($it['sku']) . ' · ' . e($it['uom']) . ' · Stock: ' . e((string) $it['stock_qty']) . '</p>
-    <p>' . nl2br(e($it['description'] ?? '')) . '</p>
-    <p><strong>MWK ' . money((float) $it['price']) . '</strong></p>
-    <form method="post" action="/cart/add">' . csrf_field() . '
+    $stock = (float) $it['stock_qty'];
+    $pill = $stock <= 0
+        ? '<span class="stock-pill stock-out">Out of stock</span>'
+        : (((float) $it['reorder_level'] > 0 && $stock <= (float) $it['reorder_level'])
+            ? '<span class="stock-pill stock-low">Only ' . e((string) $it['stock_qty']) . ' left</span>'
+            : '<span class="stock-pill stock-ok">In stock</span>');
+    $buy = $stock > 0
+        ? '<form method="post" action="/cart/add">' . csrf_field() . '
       <input type="hidden" name="item_id" value="' . (int) $it['id'] . '">
-      ' . field('Quantity', '<input name="qty" type="number" min="1" value="1">') . '
-      <button class="btn">Add to cart</button></form></div>');
+      ' . field('Quantity', '<input name="qty" type="number" min="1" max="' . (int) $stock . '" value="1">') . '
+      <button class="btn">Add to cart</button></form>'
+        : '<p><span class="stock-pill stock-out">Currently out of stock — check back soon</span></p>';
+    layout($it['name'], '
+    <div class="product"><div>' . item_img($it['image_path'] ?? null, $it['name']) . '</div><div>
+    <h1>' . e($it['name']) . '</h1>
+    <p class="mut">' . e($it['sku']) . ' · ' . e($it['uom']) . '</p>
+    <p>' . $pill . '</p>
+    <p>' . nl2br(e($it['description'] ?? '')) . '</p>
+    <p class="price-big">MWK ' . money((float) $it['price']) . '</p>
+    ' . $buy . '</div></div>');
 }
 
 function cart(): array
@@ -214,16 +278,28 @@ function pg_checkout_success(): void
 
 function pg_delights(): void
 {
-    layout('Delights', '<h1>Glamorous Delights</h1><div class="grid">
-      <div class="card"><h3>Cakes &amp; Fritters</h3><p>Custom wedding cakes, cupcakes, fritters.</p>
-        <p><a class="btn" href="/delights/cakes">Request a cake</a></p></div>
-      <div class="card"><h3>Catering</h3><p>Weddings, funerals, corporate, parties.</p>
-        <p><a class="btn" href="/delights/catering">Request catering</a></p></div>
-      <div class="card"><h3>Rentals</h3><p>Chairs, tables, tents, plates, glasses.</p>
-        <p><a class="btn" href="/delights/rentals">Browse equipment</a></p></div>
-      <div class="card"><h3>Full event</h3><p>One quotation for everything.</p>
-        <p><a class="btn" href="/delights/request">Describe your event</a></p></div>
-    </div>');
+    layout('Delights', '
+    <section class="hero-band">
+      <span class="hero-kicker">Glamorous Delights</span>
+      <h1>Your celebration, handled with love.</h1>
+      <p class="lead">Custom cakes, crowd-pleasing catering, beautiful equipment — or the whole event, end to end. Send your date and guest count; we reply with one clear quotation.</p>
+      <div class="hero-cta"><a class="btn" href="/delights/request">Request a quotation</a></div>
+    </section>
+    <div class="grid">
+      <a class="cat-card" href="/delights/cakes"><h3>Cakes &amp; Fritters</h3>
+        <p>Wedding tiers, birthday cakes, cupcakes, mandazi &amp; more — designed around your theme.</p>
+        <p class="from">' . e(delights_from('Cakes')) . '</p></a>
+      <a class="cat-card" href="/delights/catering"><h3>Catering</h3>
+        <p>Weddings, funerals, corporate &amp; parties. Menus per head, serving crew included.</p>
+        <p class="from">' . e(delights_from('Catering Menus')) . ' per head</p></a>
+      <a class="cat-card" href="/delights/rentals"><h3>Rentals</h3>
+        <p>Chairs, tables, tents, plates, glasses, chafing dishes — clean, counted &amp; on time.</p>
+        <p class="from">' . e(delights_from('Furniture')) . '</p></a>
+      <a class="cat-card" href="/delights/request"><h3>Full events</h3>
+        <p>One team for cake, food, equipment &amp; setup. Tell us the occasion — we plan it.</p>
+        <p class="from">one quotation, everything included</p></a>
+    </div>
+    <div class="trust"><span>Custom designs</span><span>Tastings on request</span><span>Deposit secures your date</span></div>');
 }
 
 function pg_rentals(): void
