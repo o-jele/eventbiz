@@ -974,6 +974,23 @@ function pg_admin_invoices(): void
 function pg_admin_settings(): void
 {
     require_role(['admin']);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_user'])) {
+        check_csrf();
+        if (post('name') === '' || post('email') === '' || ($_POST['password'] ?? '') === '') {
+            flash('Name, email and password are required.', 'err');
+            redirect('/admin/settings');
+        }
+        if (db_one('SELECT id FROM users WHERE email = ?', [post('email')])) {
+            flash('Email already exists.', 'err');
+            redirect('/admin/settings');
+        }
+        db_exec(
+            'INSERT INTO users (name, email, phone, password_hash, role) VALUES (?,?,?,?,?)',
+            [post('name'), post('email'), post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT), post('role')]
+        );
+        flash('User created — ask them to change the password on first login.');
+        redirect('/admin/settings');
+    }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         check_csrf();
         setting_set('site_name', post('site_name', 'Glamorous'));
@@ -981,11 +998,28 @@ function pg_admin_settings(): void
         flash('Settings saved.');
         redirect('/admin/settings');
     }
+    $users = db_all('SELECT id, name, email, role, active FROM users ORDER BY id');
+    $tr = [];
+    foreach ($users as $r) {
+        $tr[] = ['#' . $r['id'], e($r['name']), e($r['email']), e($r['role']), $r['active'] ? 'yes' : 'no'];
+    }
     layout('Settings', admin_nav() . '<h1>Settings</h1><div class="card"><form method="post">' . csrf_field() . '
       ' . field('Site name', '<input name="site_name" value="' . e(setting_get('site_name', 'Glamorous')) . '">') . '
       ' . field('WhatsApp number (international digits, e.g. 265991234567 — enables the chat button)', '<input name="whatsapp" value="' . e(setting_get('whatsapp', '')) . '" inputmode="numeric">') . '
       <button class="btn">Save</button></form></div>
-      <p class="mut">Currency is MWK and fixed at install — changing it later needs accountant review.</p>');
+      <p class="mut">Currency is MWK and fixed at install — changing it later needs accountant review.</p>
+      <h2>User accounts</h2>' . table(['#', 'Name', 'Email', 'Role', 'Active'], $tr) . '
+      <h3>New staff login</h3><div class="card"><form method="post">' . csrf_field() . '<input type="hidden" name="new_user" value="1">
+      ' . field('Name', '<input name="name" required>') . field('Email', '<input type="email" name="email" required>') . '
+      ' . field('Phone', '<input name="phone">') . field('Temp password', '<input name="password" required>') . '
+      ' . field('Role', '<select name="role"><option value="creations_staff">Creations Staff</option><option value="delights_sales">Delights Sales</option><option value="delights_ops">Delights Ops</option><option value="accounts">Accounts Manager</option><option value="admin">Admin</option></select>') . '
+      <button class="btn">Create login</button></form></div>');
+}
+
+function pg_admin_users(): void
+{
+    // User accounts live under Settings now; keep the old route working.
+    redirect('/admin/settings');
 }
 
 // ---------- All quotations ----------

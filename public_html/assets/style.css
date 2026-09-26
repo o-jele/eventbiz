@@ -424,13 +424,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .btn svg, .theme-btn svg { vertical-align: -3px; }
 .theme-btn.icon-btn { display: inline-flex; align-items: center; padding: .45rem .7rem; }
 @media (min-width: 1024px) {
-  body.has-side .topbar { margin-left: 248px; }
-  body.has-side.side-mini .topbar { margin-left: 78px; }
   body.has-side .staff-shell { display: block; }
   body.has-side .staff-main { margin-left: 248px; min-width: 0; }
   body.has-side.side-mini .staff-main { margin-left: 78px; }
   body.has-side .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 248px; z-index: 60;
+    position: fixed; left: 0; top: 60px; bottom: 0; width: 248px; z-index: 60;
     background: var(--card); border-right: 1px solid var(--line);
     padding: 1.1rem .9rem; overflow-y: auto;
     display: flex; flex-direction: column; gap: .2rem;

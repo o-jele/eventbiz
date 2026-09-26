@@ -10,6 +10,9 @@ function layout(string $title, string $body, string $active = ''): void
     // Brand mark follows the business context: each subsidiary shows its own logo.
     $brandPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
     $brandCtx = function_exists('context_key_for_path') ? context_key_for_path($brandPath) : 'neutral';
+    // Staff chrome (sidebar + staff topbar) only inside /admin — the public
+    // site, including View-site homepage, always renders full-screen.
+    $staffChrome = $isStaff && str_starts_with($brandPath, '/admin');
     $brandHtml = '<a class="brand" href="/">Glamorous<em>.</em></a>';
     if ($brandCtx === 'creations') {
         $brandHtml = '<a class="brand" href="/creations"><img class="brand-logo" src="/assets/img/logo-creations.jpg" alt="Glamorous Creations"></a>';
@@ -30,11 +33,11 @@ function layout(string $title, string $body, string $active = ''): void
 <link rel="stylesheet" href="/assets/style.css">
 <script>try{var _t=localStorage.getItem("glam-theme");if(_t==="dark"||(!_t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.dataset.theme="dark";}document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("theme-toggle");function icons(){var s=document.getElementById("theme-icon-sun"),m=document.getElementById("theme-icon-moon");if(s&&m){var dark=document.documentElement.dataset.theme==="dark";s.style.display=dark?"none":"";m.style.display=dark?"":"none";}}if(b){b.onclick=function(){var d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"light":"dark";try{localStorage.setItem("glam-theme",d?"light":"dark");}catch(e){}icons();};}icons();});}catch(e){}</script>
 </head>
-<body<?= $isStaff ? ' class="has-side"' : '' ?>>
+<body<?= $staffChrome ? ' class="has-side"' : '' ?>>
 <header class="topbar">
-  <?php if ($isStaff): ?><button id="side-burger" aria-label="Open menu">&#9776;</button><?php endif; ?>
+  <?php if ($staffChrome): ?><button id="side-burger" aria-label="Open menu">&#9776;</button><?php endif; ?>
   <?= $brandHtml ?>
-  <?php if ($isStaff): ?>
+  <?php if ($staffChrome): ?>
   <nav class="staff-top">
     <button id="theme-toggle" class="theme-btn icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">
       <span id="theme-icon-sun"><?= icon('sun') ?></span><span id="theme-icon-moon" style="display:none"><?= icon('moon') ?></span>
@@ -59,7 +62,7 @@ function layout(string $title, string $body, string $active = ''): void
   </nav>
   <?php endif; ?>
 </header>
-<?php if ($isStaff && function_exists('staff_sidebar')): ?>
+<?php if ($staffChrome && function_exists('staff_sidebar')): ?>
 <div class="staff-shell">
   <div class="side-veil" id="side-close"></div>
   <aside class="sidebar" aria-label="Staff navigation"><?= staff_sidebar() ?></aside>
@@ -71,7 +74,7 @@ function layout(string $title, string $body, string $active = ''): void
   <?php endif; ?>
   <?= $body ?>
 </main>
-<?php if ($isStaff && function_exists('staff_sidebar')): ?>
+<?php if ($staffChrome && function_exists('staff_sidebar')): ?>
   </div>
 </div>
 <?php endif; ?>

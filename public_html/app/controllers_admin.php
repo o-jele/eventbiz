@@ -15,7 +15,7 @@ function staff_sidebar(): string
                     ['/admin/quotations', 'Quotations', 'quotations'], ['/admin/invoices', 'Invoices', 'invoices']],
         'Stock' => [['/admin/items', 'Items', 'items'], ['/admin/purchases', 'Purchasing', 'purchasing'],
                     ['/admin/transfers', 'Transfers', 'transfers'], ['/admin/warehouse', 'Warehouse', 'warehouse']],
-        'Setup' => [['/admin/users', 'Users', 'users'], ['/admin/reports', 'Reports', 'reports'],
+        'Setup' => [['/admin/reports', 'Reports', 'reports'],
                     ['/admin/settings', 'Settings', 'settings']],
     ];
     $open = (int) (db_one("SELECT COUNT(*) AS c FROM enquiries WHERE status = 'Open'")['c'] ?? 0);
@@ -40,7 +40,7 @@ function staff_sidebar(): string
     $initials = strtoupper(implode('', array_map(fn($w) => mb_substr($w, 0, 1), $words)));
     $h .= '<div class="side-foot">'
         . '<div class="side-user"><span class="avatar-lg sm">' . e($initials) . '</span>'
-        . '<span class="who"><strong>(' . e($initials) . ') ' . e($name) . ' <a href="/logout">[logout]</a></strong><small>' . e($role) . '</small></span></div>'
+        . '<span class="who"><strong>' . e($name) . ' <a href="/logout" title="Logout">' . icon('logout') . '</a></strong><small>' . e($role) . '</small></span></div>'
         . '<div class="side-row"><button id="side-collapse" class="theme-btn" title="Collapse sidebar">⇤</button></div>'
         . '</div>';
     $h .= '<script>(function(){try{'
@@ -933,10 +933,23 @@ function pg_admin_items(): void
     foreach ($whs as $w) {
         $whOpts .= '<option value="' . (int) $w['id'] . '">' . e($w['name']) . '</option>';
     }
+    $wf = (int) get_param('w');
+    $bal = [];
+    if ($wf) {
+        foreach (db_all('SELECT item_id, COALESCE(SUM(qty_change),0) AS b FROM stock_moves WHERE warehouse_id = ? GROUP BY item_id', [$wf]) as $br) {
+            $bal[(int) $br['item_id']] = (float) $br['b'];
+        }
+    }
+    $fchips = '<div class="chips"><a href="/admin/items" class="' . ($wf ? '' : 'on') . '">All warehouses</a>';
+    foreach ($whs as $x) {
+        $fchips .= '<a href="/admin/items?w=' . (int) $x['id'] . '" class="' . ($wf === (int) $x['id'] ? 'on' : '') . '">' . e($x['name']) . '</a>';
+    }
+    $fchips .= '</div>';
     foreach ($rows as $r) {
         $thumb = !empty($r['image_path']) ? item_img($r['image_path'], $r['name']) : '';
+        $here = $wf ? e((string) ($bal[(int) $r['id']] ?? 0)) : '<span class="mut">—</span>';
         $tr[] = [e($r['sku']), $thumb . e($r['name']) . '<br><span class="mut">' . e((string) ($r['grp'] ?? '')) . ' · ' . e($r['item_type']) . '</span>',
-                 e((string) $r['stock_qty']), money((float) $r['price']),
+                 $here, e((string) $r['stock_qty']), money((float) $r['price']),
                  '<form method="post" action="/admin/items?adjust=' . (int) $r['id'] . '">' . csrf_field() . '
                    <input name="qty" placeholder="+/- qty" size="8">
                    <select name="warehouse_id">' . $whOpts . '</select>
@@ -952,8 +965,8 @@ function pg_admin_items(): void
     foreach ($comps as $c) {
         $copts .= '<option value="' . (int) $c['id'] . '">' . e($c['name']) . '</option>';
     }
-    layout('Items', admin_nav() . '<h1>Items &amp; stock</h1>' .
-        table(['SKU', 'Item', 'Stock', 'Price', 'Adjust'], $tr) . '
+    layout('Items', admin_nav() . '<h1>Items &amp; stock</h1>' . $fchips .
+        table(['SKU', 'Item', 'Here', 'Stock', 'Price', 'Adjust'], $tr) . '
         <h2>New item</h2><div class="card"><form method="post" action="/admin/items?new=1" enctype="multipart/form-data">' . csrf_field() . '
         ' . field('SKU', '<input name="sku" required>') . field('Name', '<input name="name" required>') . '
         ' . field('Group', '<select name="item_group_id">' . $gopts . '</select>') . '
@@ -966,35 +979,6 @@ function pg_admin_items(): void
         ' . field('Photo (website)', '<input type="file" name="image" accept="image/*">') . '
         ' . field('Published on website', '<select name="published"><option value="0">No</option><option value="1">Yes</option></select>') . '
         <button class="btn">Create item</button></form></div>');
-}
-
-function pg_admin_users(): void
-{
-    require_role(['admin']);
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        check_csrf();
-        if (db_one('SELECT id FROM users WHERE email = ?', [post('email')])) {
-            flash('Email already exists.', 'err');
-            redirect('/admin/users');
-        }
-        db_exec(
-            'INSERT INTO users (name, email, phone, password_hash, role) VALUES (?,?,?,?,?)',
-            [post('name'), post('email'), post('phone'), password_hash($_POST['password'] ?? 'changeme123', PASSWORD_DEFAULT), post('role')]
-        );
-        flash('User created.');
-        redirect('/admin/users');
-    }
-    $rows = db_all('SELECT id, name, email, role, active FROM users ORDER BY id');
-    $tr = [];
-    foreach ($rows as $r) {
-        $tr[] = ['#' . $r['id'], e($r['name']), e($r['email']), e($r['role']), $r['active'] ? 'yes' : 'no'];
-    }
-    layout('Users', admin_nav() . '<h1>Users</h1>' . table(['#', 'Name', 'Email', 'Role', 'Active'], $tr) . '
-      <h2>New staff</h2><div class="card"><form method="post">' . csrf_field() . '
-      ' . field('Name', '<input name="name" required>') . field('Email', '<input type="email" name="email" required>') . '
-      ' . field('Phone', '<input name="phone">') . field('Temp password', '<input name="password" value="changeme123">') . '
-      ' . field('Role', '<select name="role"><option value="creations_staff">Creations Staff</option><option value="delights_sales">Delights Sales</option><option value="delights_ops">Delights Ops</option><option value="accounts">Accounts Manager</option><option value="admin">Admin</option></select>') . '
-      <button class="btn">Create</button></form></div>');
 }
 
 function pg_admin_reports(): void
