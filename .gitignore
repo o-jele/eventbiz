@@ -8,3 +8,5 @@ build/
 public_html/config.php
 public_html/uploads/
 *.zip
+# Third-party reference copy (OpenSourcePOS, MIT) — local study only, not our code
+opensourcepos/
