@@ -265,6 +265,8 @@ a.card { text-decoration: none; color: inherit; display: block; }
 .stat p { margin: .4rem 0 .3rem; }
 .stat.alert { border-color: var(--rose); }
 .stat.alert .n { color: var(--rose-deep); }
+a.stat { text-decoration: none; color: inherit; display: block; transition: transform .15s ease, box-shadow .15s ease; }
+a.stat:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); padding: 1.2rem 1.3rem; margin-bottom: 1.2rem; box-shadow: var(--shadow-sm); }
 .panel h3 { margin-top: 0; font-size: 1.15rem; }
 .stat-line { font-size: 1.05rem; }
