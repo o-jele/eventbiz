@@ -387,6 +387,28 @@ function pg_admin(): void
 function pg_admin_enquiries(): void
 {
     $u = require_role(['admin', 'accounts', 'delights_sales', 'creations_staff']);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_enquiry'])) {
+        check_csrf();
+        $companyId = (int) post('company_id');
+        $company = company_name($companyId);
+        if (!$company) {
+            exit('Pick a company.');
+        }
+        guard_company($company);
+        if (post('name') === '' || (post('phone') === '' && post('email') === '')) {
+            flash('Name plus phone or email is required.', 'err');
+            redirect('/admin/enquiries');
+        }
+        db_exec(
+            'INSERT INTO enquiries (company_id, enquiry_type, name, phone, email, subject, message, event_date, source, status)
+             VALUES (?,?,?,?,?,?,?,?,?,?)',
+            [$companyId, post('enquiry_type', 'General'), post('name'), post('phone') ?: null, post('email') ?: null,
+             post('subject') ?: (post('enquiry_type', 'General') . ' enquiry (staff logged)'), post('message'),
+             post('event_date') ?: null, post('source', 'Walk-in'), 'Open']
+        );
+        flash('Enquiry #' . db_last_id() . ' logged.');
+        redirect('/admin/enquiries');
+    }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_enquiry'])) {
         check_csrf();
         $enq = db_one('SELECT * FROM enquiries WHERE id = ?', [(int) $_POST['convert_enquiry']]);
@@ -425,7 +447,20 @@ function pg_admin_enquiries(): void
                   <input type="hidden" name="close_enquiry" value="' . (int) $r['id'] . '">
                   <button class="btn sec">Close</button></form>'];
     }
-    layout('Enquiries', admin_nav() . '<h1>Enquiry inbox</h1>' .
+    $comps = db_all('SELECT * FROM companies ORDER BY id');
+    $copts = '';
+    foreach ($comps as $c) {
+        $copts .= '<option value="' . (int) $c['id'] . '">' . e($c['name']) . '</option>';
+    }
+    layout('Enquiries', admin_nav() . '<h1>Enquiry inbox</h1>
+      <div class="card"><h3>Log an enquiry (walk-in / phone / WhatsApp)</h3><form method="post">' . csrf_field() . '<input type="hidden" name="new_enquiry" value="1">
+      <div class="row2">' . field('For company', '<select name="company_id">' . $copts . '</select>') . field('Type', '<select name="enquiry_type"><option>General</option><option>Wedding</option><option>Catering</option><option>Rental</option><option>Cake</option><option>Fritters</option><option>Other Bakery</option><option>Product</option></select>') . '</div>
+      <div class="row2">' . field('Name', '<input name="name" required>') . field('Phone', '<input name="phone" inputmode="tel">') . '</div>
+      <div class="row2">' . field('Email', '<input name="email" type="email">') . field('Event date', '<input type="date" name="event_date">') . '</div>
+      ' . field('Subject', '<input name="subject">') . '
+      ' . field('Message', '<textarea name="message" rows="2" required></textarea>') . '
+      ' . field('Source', '<select name="source"><option>Walk-in</option><option>Phone</option><option>WhatsApp</option><option>Referral</option><option>Website</option></select>') . '
+      <button class="btn">Log enquiry</button></form></div>' .
         ($tr ? table(['Brand', 'Subject', 'Contact', 'Type/Status', ''], $tr) : '<p class="mut">Inbox zero.</p>'));
 }
 
