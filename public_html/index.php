@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/app/bootstrap.php';
 require __DIR__ . '/app/lib.php';
+require __DIR__ . '/app/dashcharts.php';
 require __DIR__ . '/app/views_layout.php';
 require __DIR__ . '/app/controllers_public.php';
 require __DIR__ . '/app/controllers_portal.php';

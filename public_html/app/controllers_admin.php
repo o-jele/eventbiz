@@ -25,6 +25,8 @@ function admin_nav(): string
             $h .= '<a href="' . $url . '"' . ($n ? ' class="hot"' : '') . '>' . $label . ($n ? ' (' . $n . ')' : '') . '</a>';
         }
     }
+    $h .= '<button id="theme-toggle" class="theme-btn" title="Toggle dark mode">◐ Dark</button>';
+    $h .= '<script>(function(){try{var t=localStorage.getItem("glam-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.dataset.theme="dark";}document.getElementById("theme-toggle").onclick=function(){var d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"light":"dark";localStorage.setItem("glam-theme",d?"light":"dark");};}catch(e){}})();</script>';
     return $h . '</nav>';
 }
 
@@ -46,6 +48,119 @@ function pg_admin(): void
     $today = db_one(
         'SELECT COUNT(*) AS n, COALESCE(SUM(grand_total),0) AS t FROM sales_orders WHERE DATE(created_at) = CURDATE()' . $co('sales_orders'), $scp
     );
+
+    // Trend + sparkline data (this 7 days vs prior 7).
+    $byDay = function (string $table, string $sumCol, string $dateCol, ?string $companyCol) use ($scope): array {
+        $sql = "SELECT DATE($dateCol) AS d, COUNT(*) AS n, COALESCE(SUM($sumCol),0) AS t FROM $table WHERE $dateCol >= CURDATE() - INTERVAL 6 DAY";
+        $p = [];
+        if ($scope && $companyCol) {
+            $sql .= " AND $companyCol = ?";
+            $p[] = $scope;
+        }
+        $sql .= " GROUP BY DATE($dateCol)";
+        $map = [];
+        foreach (db_all($sql, $p) as $r) {
+            $map[$r['d']] = $r;
+        }
+        return $map;
+    };
+    $range = [];
+    for ($i = 6; $i >= 0; $i--) {
+        $range[] = date('Y-m-d', strtotime("-$i days"));
+    }
+    $series = function (array $map) use ($range): array {
+        $out = [];
+        foreach ($range as $d) {
+            $out[] = (float) ($map[$d]['t'] ?? 0);
+        }
+        return $out;
+    };
+    $salesMap = $byDay('sales_orders', 'grand_total', 'created_at', 'company_id');
+    $enqMap = $byDay('enquiries', '1', 'created_at', 'company_id');
+    $payMap = $byDay('payments', 'amount', 'created_at', 'company_id');
+    $prevQ = function (string $table, string $sumCol, string $dateCol, ?string $companyCol) use ($scope) {
+        $sql = "SELECT COUNT(*) AS n, COALESCE(SUM($sumCol),0) AS t FROM $table WHERE $dateCol BETWEEN CURDATE() - INTERVAL 13 DAY AND CURDATE() - INTERVAL 7 DAY";
+        $p = [];
+        if ($scope && $companyCol) {
+            $sql .= " AND $companyCol = ?";
+            $p[] = $scope;
+        }
+        return db_one($sql, $p);
+    };
+    $sPrev = $prevQ('sales_orders', 'grand_total', 'created_at', 'company_id');
+    $ePrev = $prevQ('enquiries', '1', 'created_at', 'company_id');
+    $pPrev = $prevQ('payments', 'amount', 'created_at', 'company_id');
+    $sales7 = array_sum($series($salesMap));
+    $enq7 = 0;
+    foreach ($range as $d) {
+        $enq7 += (int) ($enqMap[$d]['n'] ?? 0);
+    }
+    $pay7 = array_sum($series($payMap));
+
+    // Revenue 30d + prior 30d.
+    $days = [];
+    for ($i = 29; $i >= 0; $i--) {
+        $d = date('Y-m-d', strtotime("-$i days"));
+        $days[$d] = ['label' => date('j M', strtotime($d)), 'value' => 0];
+    }
+    foreach (db_all(
+        'SELECT DATE(created_at) AS d, COALESCE(SUM(grand_total),0) AS t FROM sales_orders
+         WHERE created_at >= CURDATE() - INTERVAL 29 DAY' . $co('sales_orders') . ' GROUP BY DATE(created_at)', $scp
+    ) as $r) {
+        if (isset($days[$r['d']])) {
+            $days[$r['d']]['value'] = (float) $r['t'];
+        }
+    }
+    $revTotal = array_sum(array_column($days, 'value'));
+    $revPrev = (float) (db_one(
+        'SELECT COALESCE(SUM(grand_total),0) AS t FROM sales_orders
+         WHERE created_at BETWEEN CURDATE() - INTERVAL 59 DAY AND CURDATE() - INTERVAL 30 DAY' . $co('sales_orders'), $scp
+    )['t'] ?? 0);
+
+    // Sales mix donut (30d).
+    $mixRows = db_all(
+        "SELECT CASE WHEN g.name IN ('Catering Menus','Catering Services') THEN 'Catering'
+          WHEN g.name IN ('Furniture','Cookware & Serving','Tents & Decor') THEN 'Rentals'
+          WHEN g.name IN ('Cakes','Fritters & Snacks') THEN 'Bakery' ELSE 'Shop' END AS bucket,
+          COALESCE(SUM(si.amount),0) AS t
+         FROM sales_order_items si JOIN sales_orders o ON o.id = si.order_id
+         JOIN items i ON i.id = si.item_id LEFT JOIN item_groups g ON g.id = i.item_group_id
+         WHERE o.created_at >= CURDATE() - INTERVAL 29 DAY" . $co('o') . ' GROUP BY bucket', $scp
+    );
+    $mixColors = ['Shop' => '#1A1A1A', 'Bakery' => '#DE7FB8', 'Catering' => '#C9A24B', 'Rentals' => '#7D9B76'];
+    $mix = [];
+    foreach ($mixRows as $m) {
+        $mix[] = ['label' => $m['bucket'], 'value' => (float) $m['t'], 'color' => $mixColors[$m['bucket']] ?? '#999'];
+    }
+
+    // Tops.
+    $topCust = db_all(
+        'SELECT k.name, COALESCE(SUM(o.grand_total),0) AS t FROM sales_orders o JOIN customers k ON k.id = o.customer_id
+         WHERE o.created_at >= CURDATE() - INTERVAL 29 DAY' . $co('o') . ' GROUP BY k.id ORDER BY t DESC LIMIT 5', $scp
+    );
+    $topItems = db_all(
+        'SELECT i.name, COALESCE(SUM(si.qty),0) AS q, COALESCE(SUM(si.amount),0) AS t FROM sales_order_items si
+         JOIN sales_orders o ON o.id = si.order_id JOIN items i ON i.id = si.item_id
+         WHERE o.created_at >= CURDATE() - INTERVAL 6 DAY' . $co('o') . ' GROUP BY i.id ORDER BY t DESC LIMIT 5', $scp
+    );
+
+    // Calendar strip data (14d window).
+    $calEvents = db_all(
+        "SELECT id, name, event_date FROM events
+         WHERE event_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 13 DAY)
+           AND status NOT IN ('Completed','Cancelled') ORDER BY event_date"
+    );
+    $dots = [];
+    foreach ($calEvents as $ce) {
+        $dots[$ce['event_date']][] = $ce;
+    }
+    $strip = '';
+    for ($i = 0; $i < 14; $i++) {
+        $d = date('Y-m-d', strtotime("+$i days"));
+        $has = isset($dots[$d]);
+        $strip .= '<div class="cal-day' . ($has ? ' has' : '') . '">' . date('D', strtotime($d)) . '<b>' . date('j', strtotime($d)) . '</b>'
+            . ($has ? count($dots[$d]) . '●' : '') . '</div>';
+    }
     $upcoming = db_all(
         "SELECT v.id, v.name, v.event_date, v.status, k.name AS customer FROM events v
          JOIN customers k ON k.id = v.customer_id
@@ -53,67 +168,138 @@ function pg_admin(): void
            AND v.status NOT IN ('Completed','Cancelled') ORDER BY v.event_date LIMIT 8"
     );
     $out = db_all(
-        "SELECT b.id, b.event_date, k.name AS customer FROM rental_bookings b
+        "SELECT b.id, b.return_expected, k.name AS customer FROM rental_bookings b
          JOIN customers k ON k.id = b.customer_id
-         WHERE b.status IN ('Dispatched','At Customer') ORDER BY b.event_date LIMIT 6"
+         WHERE b.status IN ('Dispatched','At Customer') ORDER BY b.return_expected LIMIT 6"
     );
-    $feed = db_all(
-        "(SELECT 'order' AS t, CONCAT('Order #', o.id, ' · ', k.name, ' · MWK ', FORMAT(o.grand_total, 0)) AS d, o.created_at AS c
-           FROM sales_orders o JOIN customers k ON k.id = o.customer_id WHERE 1=1" . $co('o') . ")
-         UNION ALL (SELECT 'payment', CONCAT('Payment ', p.method, ' · MWK ', FORMAT(p.amount, 0)), p.created_at
-           FROM payments p WHERE 1=1" . $co('p') . ")
-         UNION ALL (SELECT 'enquiry', CONCAT(eq.enquiry_type, ': ', eq.subject), eq.created_at FROM enquiries eq)
-         UNION ALL (SELECT 'transfer', CONCAT('Transfer #', t.id), t.created_at FROM transfers t)
-         UNION ALL (SELECT 'rental', CONCAT('Booking #', b.id), b.created_at FROM rental_bookings b)
-         ORDER BY c DESC LIMIT 10",
-        array_merge($scp, $scp)
-    );
+    $af = get_param('af', 'all');
+    $parts = [];
+    $fp = [];
+    if ($af === 'all' || $af === 'orders') {
+        $parts[] = "(SELECT 'order' AS t, CONCAT('Order #', o.id, ' · ', k.name) AS d, o.status AS s, o.created_at AS c
+          FROM sales_orders o JOIN customers k ON k.id = o.customer_id WHERE 1=1" . $co('o') . ')';
+        $fp = array_merge($fp, $scp);
+    }
+    if ($af === 'all' || $af === 'payments') {
+        $parts[] = "(SELECT 'payment' AS t, CONCAT(p.method, ' · MWK ', FORMAT(p.amount, 0)) AS d, 'posted' AS s, p.created_at AS c
+          FROM payments p WHERE 1=1" . $co('p') . ')';
+        $fp = array_merge($fp, $scp);
+    }
+    if ($af === 'all' || $af === 'bookings') {
+        $parts[] = "(SELECT 'rental' AS t, CONCAT('Booking #', b.id, ' · ', k.name) AS d, b.status AS s, b.created_at AS c
+          FROM rental_bookings b JOIN customers k ON k.id = b.customer_id)";
+        $parts[] = "(SELECT 'enquiry' AS t, CONCAT(eq.enquiry_type, ': ', eq.subject) AS d, eq.status AS s, eq.created_at AS c FROM enquiries eq)";
+        $parts[] = "(SELECT 'transfer' AS t, CONCAT('Transfer #', t.id) AS d, 'done' AS s, t.created_at AS c FROM transfers t)";
+    }
+    $feed = $parts ? db_all(implode(' UNION ALL ', $parts) . ' ORDER BY c DESC LIMIT 12', $fp) : [];
+    $badge = function (string $s): string {
+        $ok = ['Completed', 'Paid', 'posted', 'done', 'Delivered', 'Confirmed', 'Approved', 'Converted', 'Returned', 'Settled'];
+        $bad = ['Cancelled', 'Rejected'];
+        $cls = in_array($s, $ok, true) ? 'ok' : (in_array($s, $bad, true) ? 'bad' : 'warn');
+        return '<span class="status-badge ' . $cls . '">' . e($s) . '</span>';
+    };
     $low = db_all('SELECT sku, name, stock_qty FROM items WHERE item_type = ? AND stock_qty <= reorder_level AND reorder_level > 0 LIMIT 8', ['stock']);
+    $oos = db_all("SELECT name, stock_qty FROM items WHERE item_type = 'stock' AND stock_qty <= 0 AND published = 1 ORDER BY name LIMIT 6");
 
     $stat = function (string $num, string $label, string $link, bool $alert = false): string {
         return '<div class="stat' . ($alert ? ' alert' : '') . '"><div class="n">' . $num . '</div>'
             . '<div class="l">' . e($label) . '</div><p><a href="' . $link . '">Open →</a></p></div>';
     };
+    $tile = function (string $num, string $label, string $link, string $spark, string $badgeHtml, bool $alert = false): string {
+        return '<div class="stat' . ($alert ? ' alert' : '') . '"><div class="row"><div><div class="n">' . $num . '</div>'
+            . '<div class="l">' . e($label) . ' ' . $badgeHtml . '</div></div><div>' . $spark . '</div></div>'
+            . '<p><a href="' . $link . '">Open →</a></p></div>';
+    };
     $opsOnly = $u['role'] !== 'creations_staff';
 
     $upHtml = '';
     foreach ($upcoming as $v) {
+        $inDays = (int) ((strtotime($v['event_date']) - strtotime(date('Y-m-d'))) / 86400);
         $upHtml .= '<li><a href="/admin/events?view=' . (int) $v['id'] . '">' . e($v['name']) . '</a>'
-            . '<br><span class="t">' . e($v['event_date']) . ' · ' . e($v['customer']) . ' · ' . e($v['status']) . '</span></li>';
+            . '<br><span class="t">' . e($v['event_date']) . ' · in ' . $inDays . 'd · ' . e($v['customer']) . ' · ' . e($v['status']) . '</span></li>';
     }
     $outHtml = '';
     foreach ($out as $b) {
-        $outHtml .= '<li><a href="/admin/rentals?view=' . (int) $b['id'] . '">Booking #' . (int) $b['id'] . '</a>'
-            . '<br><span class="t">' . e($b['customer']) . ' · back ' . e($b['event_date']) . '</span></li>';
+        $its = db_all(
+            'SELECT i.qty, t.name FROM rental_booking_items i JOIN items t ON t.id = i.item_id WHERE i.booking_id = ?',
+            [(int) $b['id']]
+        );
+        $desc = [];
+        foreach ($its as $it) {
+            $desc[] = (int) $it['qty'] . '× ' . $it['name'];
+        }
+        $outHtml .= '<li><a href="/admin/rentals?view=' . (int) $b['id'] . '">Booking #' . (int) $b['id'] . '</a> ' . e($b['customer'])
+            . '<br><span class="t">' . e(implode(', ', $desc)) . ' · back ' . e($b['return_expected']) . '</span></li>';
     }
     $feedHtml = '';
+    $lastDay = '';
     foreach ($feed as $f) {
-        $feedHtml .= '<li>' . e($f['d']) . '<br><span class="t">' . e($f['t']) . ' · ' . e($f['c']) . '</span></li>';
+        $day = substr((string) $f['c'], 0, 10);
+        $dayLabel = $day === date('Y-m-d') ? 'Today' : ($day === date('Y-m-d', strtotime('-1 day')) ? 'Yesterday' : $day);
+        if ($dayLabel !== $lastDay) {
+            $feedHtml .= '</ul><h4 style="margin:.8rem 0 .2rem">' . e($dayLabel) . '</h4><ul class="feed">';
+            $lastDay = $dayLabel;
+        }
+        $feedHtml .= '<li><div class="feed-item"><span class="fava t-' . e($f['t']) . '">' . strtoupper(e(substr($f['t'], 0, 1))) . '</span>'
+            . '<div>' . e($f['d']) . ' ' . $badge((string) $f['s']) . '<br><span class="t">' . e($f['c']) . '</span></div></div></li>';
     }
-    $lowHtml = '';
+    $feedHtml = $feedHtml ? '<ul class="feed" style="display:none"></ul>' . $feedHtml . '</ul>' : '';
+    $tabs = '';
+    foreach (['all' => 'All', 'orders' => 'Orders', 'payments' => 'Payments', 'bookings' => 'Bookings'] as $k => $label) {
+        $tabs .= '<a href="/admin?af=' . $k . '" class="' . ($af === $k ? 'on' : '') . '">' . $label . '</a>';
+    }
+    $invHtml = '';
+    foreach ($oos as $l) {
+        $invHtml .= '<li class="inv-alert out" style="padding-left:.6rem">' . e($l['name']) . ' <span class="t">OUT OF STOCK</span></li>';
+    }
     foreach ($low as $l) {
-        $lowHtml .= '<li>' . e($l['name']) . ' <span class="t">' . e((string) $l['stock_qty']) . ' left</span></li>';
+        $invHtml .= '<li class="inv-alert" style="padding-left:.6rem">' . e($l['name']) . ' <span class="t">' . e((string) $l['stock_qty']) . ' left</span></li>';
+    }
+    $topCustHtml = '';
+    foreach ($topCust as $c) {
+        $topCustHtml .= '<li>' . e($c['name']) . ' <span class="t">MWK ' . money((float) $c['t']) . '</span></li>';
+    }
+    $topItemsHtml = '';
+    foreach ($topItems as $it) {
+        $topItemsHtml .= '<li>' . e($it['name']) . ' <span class="t">' . (int) $it['q'] . ' sold · MWK ' . money((float) $it['t']) . '</span></li>';
     }
 
     layout('Staff', admin_nav()
-        . '<h1>' . $greet . ', ' . e($u['name']) . '</h1><p class="mut">' . date('l, j F Y') . ' · here is your business at a glance.</p>'
+        . '<h1>' . $greet . ', ' . e($u['name']) . '</h1><p class="mut">' . date('l, j F Y') . ' – here is your business at a glance.</p>'
+        . '<div class="quick-actions"><a class="btn sec" href="/admin/pos">New sale</a>'
+        . '<a class="btn sec" href="/admin/events?new=1">New event</a>'
+        . '<a class="btn sec" href="/admin/rentals?new=1">New booking</a>'
+        . '<a class="btn sec" href="/admin/purchases">Receive stock</a></div>'
         . '<div class="stats">'
-        . $stat((string) $open, 'open enquiries', '/admin/enquiries', $open > 0)
-        . $stat((string) ($pend['n'] ?? 0), 'payments to verify', '/admin/payments', ($pend['n'] ?? 0) > 0)
-        . $stat((string) $ret, 'rentals awaiting return', '/admin/rentals', $ret > 0)
-        . $stat(money((float) ($unpaid['t'] ?? 0)), 'owed by customers (' . (int) ($unpaid['n'] ?? 0) . ')', '/admin/invoices?f=unpaid', ($unpaid['n'] ?? 0) > 0)
+        . $tile((string) $open, 'open enquiries', '/admin/enquiries',
+            svg_sparkline($series($enqMap)), trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0)
+        . $tile(money((float) ($pend['t'] ?? 0)), 'to verify (' . (int) ($pend['n'] ?? 0) . ')', '/admin/payments',
+            svg_sparkline($series($payMap)), trend_badge(trend_of((float) $pay7, (float) ($pPrev['t'] ?? 0))), ($pend['n'] ?? 0) > 0)
+        . $tile(money($revTotal), 'revenue 30d', '/admin/reports',
+            svg_sparkline(array_column(array_values($days), 'value')), trend_badge(trend_of($revTotal, $revPrev)), false)
+        . $tile(money((float) ($unpaid['t'] ?? 0)), 'owed (' . (int) ($unpaid['n'] ?? 0) . ' invoices)', '/admin/invoices?f=unpaid',
+            '', '', ($unpaid['n'] ?? 0) > 0)
         . '</div>'
+        . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big">MWK ' . money($revTotal) . '</span>'
+        . trend_badge(trend_of($revTotal, $revPrev)) . '<span class="mut">vs prior 30d</span></div>'
+        . '<div class="dash-grid" style="grid-template-columns:8fr 4fr">'
+        . '<div>' . svg_area_chart(array_values($days)) . '</div>'
+        . '<div><h4>Sales mix</h4>' . ($mix ? svg_donut($mix) : '<p class="mut">No sales yet.</p>') . '</div>'
+        . '</div></div>'
         . '<div class="dash-grid"><div>'
         . '<div class="panel"><h3>Today</h3><p class="stat-line"><strong>' . (int) ($today['n'] ?? 0) . ' sales</strong> · MWK '
         . money((float) ($today['t'] ?? 0)) . ' taken</p>'
         . '<p><a class="btn sec" href="/admin/pos">New counter sale</a> <a class="btn sec" href="/admin/orders">Orders</a></p></div>'
         . ($opsOnly
-            ? '<div class="panel"><h3>Coming up (14 days)</h3>' . ($upHtml ? '<ul class="feed">' . $upHtml . '</ul>' : '<p class="mut">No events on the calendar.</p>') . '</div>'
+            ? '<div class="panel"><h3>Coming up</h3><div class="cal-strip">' . $strip . '</div>'
+              . ($upHtml ? '<ul class="feed">' . $upHtml . '</ul>' : '<p class="mut">No events on the calendar.</p>') . '</div>'
               . '<div class="panel"><h3>Equipment out</h3>' . ($outHtml ? '<ul class="feed">' . $outHtml . '</ul>' : '<p class="mut">Everything is home.</p>') . '</div>'
+              . '<div class="panel"><h3>Top this week</h3><h4>Items</h4><ul class="feed">' . ($topItemsHtml ?: '<li class="mut">No sales yet.</li>') . '</ul>'
+              . '<h4>Customers (30d)</h4><ul class="feed">' . ($topCustHtml ?: '<li class="mut">No sales yet.</li>') . '</ul></div>'
             : '')
         . '</div><div>'
-        . '<div class="panel"><h3>Latest activity</h3>' . ($feedHtml ? '<ul class="feed">' . $feedHtml . '</ul>' : '<p class="mut">Nothing yet.</p>') . '</div>'
-        . '<div class="panel"><h3>Low stock</h3>' . ($lowHtml ? '<ul class="feed">' . $lowHtml . '</ul>' : '<p class="mut">Nothing below reorder level.</p>') . '</div>'
+        . '<div class="panel"><h3>Latest activity</h3><div class="tabs">' . $tabs . '</div>' . ($feedHtml ?: '<p class="mut">Nothing yet.</p>') . '</div>'
+        . '<div class="panel"><h3>Inventory alerts</h3>' . ($invHtml ? '<ul class="feed">' . $invHtml . '</ul>' : '<p class="mut">Stock levels healthy.</p>') . '</div>'
         . '</div></div>');
 }
 
