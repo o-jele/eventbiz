@@ -202,23 +202,40 @@ function pg_admin(): void
          WHERE o.created_at >= CURDATE() - INTERVAL 6 DAY' . $co('o') . ' GROUP BY i.id ORDER BY t DESC LIMIT 5', $scp
     );
 
-    // Calendar strip data (14d window).
-    $calEvents = db_all(
+    // Monthly calendar (navigable; click a day to start booking it).
+    $cal = get_param('cal', date('Y-m'));
+    if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $cal)) {
+        $cal = date('Y-m');
+    }
+    $calFirst = $cal . '-01';
+    $calPrev = date('Y-m', strtotime($calFirst . ' -1 month'));
+    $calNext = date('Y-m', strtotime($calFirst . ' +1 month'));
+    $monthEvents = db_all(
         "SELECT id, name, event_date FROM events
-         WHERE event_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 13 DAY)
-           AND status NOT IN ('Completed','Cancelled') ORDER BY event_date"
+         WHERE event_date >= ? AND event_date < DATE_ADD(?, INTERVAL 1 MONTH)
+           AND status NOT IN ('Completed','Cancelled') ORDER BY event_date",
+        [$calFirst, $calFirst]
     );
     $dots = [];
-    foreach ($calEvents as $ce) {
+    foreach ($monthEvents as $ce) {
         $dots[$ce['event_date']][] = $ce;
     }
-    $strip = '';
-    for ($i = 0; $i < 14; $i++) {
-        $d = date('Y-m-d', strtotime("+$i days"));
-        $has = isset($dots[$d]);
-        $strip .= '<div class="cal-day' . ($has ? ' has' : '') . '">' . date('D', strtotime($d)) . '<b>' . date('j', strtotime($d)) . '</b>'
-            . ($has ? count($dots[$d]) . '●' : '') . '</div>';
+    $calCells = str_repeat('<span class="cal-empty"></span>', (int) date('N', strtotime($calFirst)) - 1);
+    $todayS = date('Y-m-d');
+    $daysIn = (int) date('t', strtotime($calFirst));
+    for ($dd = 1; $dd <= $daysIn; $dd++) {
+        $d = sprintf('%s-%02d', $cal, $dd);
+        $n = isset($dots[$d]) ? count($dots[$d]) : 0;
+        $cls = 'cal-cell' . ($n ? ' has' : '') . ($d === $todayS ? ' today' : '');
+        $titles = $n ? ' title="' . e(implode(', ', array_column($dots[$d], 'name'))) . '"' : '';
+        $calCells .= '<a class="' . $cls . '" href="/admin/events?new=1&date=' . $d . '"' . $titles . '><b>' . $dd . '</b>' . ($n ? '<i>' . $n . '</i>' : '') . '</a>';
     }
+    $calHtml = '<div class="cal-nav"><a class="btn sec" href="/admin?cal=' . $calPrev . '">Prev</a>'
+        . '<strong>' . e(date('F Y', strtotime($calFirst))) . '</strong>'
+        . '<a class="btn sec" href="/admin?cal=' . $calNext . '">Next</a></div>'
+        . '<div class="cal-month"><span class="cal-dow">Mo</span><span class="cal-dow">Tu</span><span class="cal-dow">We</span>'
+        . '<span class="cal-dow">Th</span><span class="cal-dow">Fr</span><span class="cal-dow">Sa</span><span class="cal-dow">Su</span>'
+        . $calCells . '</div>';
     $upcoming = db_all(
         "SELECT v.id, v.name, v.event_date, v.status, k.name AS customer FROM events v
          JOIN customers k ON k.id = v.customer_id
@@ -355,7 +372,7 @@ function pg_admin(): void
         . number_format((float) ($today['t'] ?? 0)) . ' taken</p>'
         . '<p><a class="btn sec" href="/admin/pos">New counter sale</a> <a class="btn sec" href="/admin/orders">Orders</a></p></div>'
         . ($opsOnly
-            ? '<div class="panel"><h3>Coming up</h3><div class="cal-strip">' . $strip . '</div>'
+            ? '<div class="panel"><h3>Coming up</h3>' . $calHtml
               . ($upHtml ? '<ul class="feed">' . $upHtml . '</ul>' : '<p class="mut">No events on the calendar.</p>') . '</div>'
               . '<div class="panel"><h3>Equipment out</h3>' . ($outHtml ? '<ul class="feed">' . $outHtml . '</ul>' : '<p class="mut">Everything is home.</p>') . '</div>'
               . '<div class="panel"><h3>Top this week</h3><h4>Items</h4><ul class="feed">' . ($topItemsHtml ?: '<li class="mut">No sales yet.</li>') . '</ul>'
@@ -422,6 +439,10 @@ function pg_admin_events(): void
 {
     $u = require_role(['admin', 'accounts', 'delights_sales', 'delights_ops']);
     if (($_GET['new'] ?? '') === '1') {
+        $preDate = get_param('date');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $preDate)) {
+            $preDate = '';
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             check_csrf();
             $companyId = company_id(GD_NAME);
@@ -439,7 +460,7 @@ function pg_admin_events(): void
         layout('New event', admin_nav() . "<h1>New event $c</h1><div class=\"card\"><form method=\"post\">" . csrf_field() . '
           ' . field('Event name', '<input name="name" required placeholder="Wedding - Banda Family">') . '
           ' . field('Type', '<select name="event_type"><option>Wedding</option><option>Funeral</option><option>Corporate</option><option>Party</option><option>Function</option><option>Other</option></select>') . '
-          ' . field('Date', '<input type="date" name="event_date" required>') . '
+          ' . field('Date', '<input type="date" name="event_date" required value="' . e($preDate) . '">') . '
           ' . field('Venue', '<input name="venue" required>') . '
           ' . field('Venue address', '<textarea name="venue_address" rows="2"></textarea>') . '
           ' . field('Guests', '<input name="guests" type="number">') . '
