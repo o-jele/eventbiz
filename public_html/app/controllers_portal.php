@@ -49,11 +49,19 @@ function pg_portal(): void
     }
     $rr = [];
     foreach ($rentals as $b) {
-        $rr[] = [brand_badge($b['company']), '#' . $b['id'], e($b['event_date']), money((float) $b['grand_total']), e($b['status'])];
+        $due = (float) $b['deposit_required'] - (float) $b['deposit_received'];
+        $dl = ($due > 0 && !in_array($b['status'], ['Returned', 'Completed', 'Cancelled'], true))
+            ? ' <a href="/declare?against=rental:' . (int) $b['id'] . '">Pay deposit</a>' : '';
+        $rr[] = [brand_badge($b['company']), '#' . $b['id'], e($b['event_date']), money((float) $b['grand_total']),
+                 e($b['status']) . '<br><span class="mut">deposit due ' . money(max(0, $due)) . '</span>' . $dl];
     }
     $kr = [];
     foreach ($cakes as $k) {
-        $kr[] = [brand_badge($k['company']), '#' . $k['id'] . ' ' . e($k['product']), e($k['required_date']), e($k['status'])];
+        $due = (float) $k['deposit_required'] - (float) $k['deposit_received'];
+        $dl = ($due > 0 && !in_array($k['status'], ['Completed', 'Cancelled'], true))
+            ? ' <a href="/declare?against=cake:' . (int) $k['id'] . '">Pay deposit</a>' : '';
+        $kr[] = [brand_badge($k['company']), '#' . $k['id'] . ' ' . e($k['product']), e($k['required_date']),
+                 e($k['status']) . '<br><span class="mut">deposit due ' . money(max(0, $due)) . '</span>' . $dl];
     }
     $er = [];
     foreach ($events as $v) {
@@ -76,44 +84,99 @@ function pg_portal(): void
 function pg_declare(): void
 {
     $u = require_login();
-    $invId = (int) get_param('invoice_id');
-    $inv = $invId ? db_one('SELECT * FROM invoices WHERE id = ?', [$invId]) : null;
-    if ($inv && (int) $inv['customer_id'] !== (int) $u['customer_id']) {
-        http_response_code(403);
-        exit('Not your invoice.');
+    $against = get_param('against', '');
+    if ($against === '' && ($_GET['invoice_id'] ?? '') !== '') {
+        $against = 'invoice:' . (int) $_GET['invoice_id']; // backwards compat
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         check_csrf();
-        $invId = (int) post('invoice_id');
-        $inv = db_one('SELECT * FROM invoices WHERE id = ?', [$invId]);
-        if (!$inv || (int) $inv['customer_id'] !== (int) $u['customer_id']) {
-            exit('Unknown invoice.');
+        $parts = explode(':', post('against', '')) + [null, null];
+        $kind = $parts[0];
+        $rid = (int) ($parts[1] ?? 0);
+        $companyId = 0;
+        $refType = '';
+        $refId = 0;
+        $invoiceId = null;
+        if ($kind === 'invoice') {
+            $inv = db_one('SELECT * FROM invoices WHERE id = ?', [$rid]);
+            if (!$inv || (int) $inv['customer_id'] !== (int) $u['customer_id']) {
+                exit('Unknown invoice.');
+            }
+            $companyId = (int) $inv['company_id'];
+            $order = $inv['order_id'] ? db_one('SELECT * FROM sales_orders WHERE id = ?', [$inv['order_id']]) : null;
+            $refType = $order ? 'sales_order' : 'invoice';
+            $refId = $order ? (int) $order['id'] : (int) $inv['id'];
+            $invoiceId = (int) $inv['id'];
+        } elseif ($kind === 'rental') {
+            $b = db_one('SELECT * FROM rental_bookings WHERE id = ?', [$rid]);
+            if (!$b || (int) $b['customer_id'] !== (int) $u['customer_id']) {
+                exit('Unknown booking.');
+            }
+            $companyId = (int) $b['company_id'];
+            $refType = 'rental_booking';
+            $refId = (int) $b['id'];
+            $link = db_one('SELECT id FROM invoices WHERE rental_booking_id = ?', [$rid]);
+            $invoiceId = $link ? (int) $link['id'] : null;
+        } elseif ($kind === 'cake') {
+            $k = db_one('SELECT * FROM cake_orders WHERE id = ?', [$rid]);
+            if (!$k || (int) $k['customer_id'] !== (int) $u['customer_id']) {
+                exit('Unknown cake order.');
+            }
+            $companyId = (int) $k['company_id'];
+            $refType = 'cake_order';
+            $refId = (int) $k['id'];
+            $link = db_one('SELECT id FROM invoices WHERE cake_order_id = ?', [$rid]);
+            $invoiceId = $link ? (int) $link['id'] : null;
+        } else {
+            exit('Pick what this payment is for.');
         }
-        $order = $inv['order_id'] ? db_one('SELECT * FROM sales_orders WHERE id = ?', [$inv['order_id']]) : null;
         db_exec(
             "INSERT INTO payment_declarations (company_id, customer_id, ref_type, ref_id, invoice_id, amount,
              method, reference, payment_date, proof_path, sender_detail, status, created_by)
              VALUES (?,?,?,?,?,?,?,?,?,?,?, 'Pending Verification', ?)",
-            [(int) $inv['company_id'], (int) $u['customer_id'],
-             $order ? 'sales_order' : 'invoice', $order ? (int) $order['id'] : (int) $inv['id'],
-             (int) $inv['id'], (float) post('amount'), post('method'), post('reference'),
+            [$companyId, (int) $u['customer_id'], $refType, $refId, $invoiceId,
+             (float) post('amount'), post('method'), post('reference'),
              post('payment_date') ?: date('Y-m-d'), save_upload('proof'), post('sender_detail'),
              (int) $u['id']]
         );
         flash('Payment declaration submitted. Staff will verify it shortly.');
         redirect('/my-glamorous');
     }
-    $invites = db_all(
-        'SELECT * FROM invoices WHERE customer_id = ? AND (total - paid) > 0 ORDER BY id DESC', [(int) $u['customer_id']]
-    );
+    $cid = (int) $u['customer_id'];
     $opts = '';
+    $invites = db_all(
+        'SELECT * FROM invoices WHERE customer_id = ? AND (total - paid) > 0 ORDER BY id DESC', [$cid]
+    );
     foreach ($invites as $i) {
-        $sel = $inv && (int) $inv['id'] === (int) $i['id'] ? ' selected' : '';
-        $opts .= '<option value="' . (int) $i['id'] . '"' . $sel . '>#' . (int) $i['id'] . ' · '
+        $val = 'invoice:' . (int) $i['id'];
+        $sel = $against === $val ? ' selected' : '';
+        $opts .= '<option value="' . $val . '"' . $sel . '>Invoice #' . (int) $i['id'] . ' · '
             . e($i['label']) . ' · balance MWK ' . money((float) $i['total'] - (float) $i['paid']) . '</option>';
     }
+    $deps = db_all(
+        "SELECT id, grand_total, deposit_required, deposit_received FROM rental_bookings
+         WHERE customer_id = ? AND (deposit_required - deposit_received) > 0
+         AND status NOT IN ('Returned','Completed','Cancelled') ORDER BY id DESC", [$cid]
+    );
+    foreach ($deps as $d) {
+        $val = 'rental:' . (int) $d['id'];
+        $sel = $against === $val ? ' selected' : '';
+        $opts .= '<option value="' . $val . '"' . $sel . '>Rental booking #' . (int) $d['id']
+            . ' · deposit due MWK ' . money((float) $d['deposit_required'] - (float) $d['deposit_received']) . '</option>';
+    }
+    $cdeps = db_all(
+        "SELECT id, price, deposit_required, deposit_received FROM cake_orders
+         WHERE customer_id = ? AND (deposit_required - deposit_received) > 0
+         AND status NOT IN ('Completed','Cancelled') ORDER BY id DESC", [$cid]
+    );
+    foreach ($cdeps as $d) {
+        $val = 'cake:' . (int) $d['id'];
+        $sel = $against === $val ? ' selected' : '';
+        $opts .= '<option value="' . $val . '"' . $sel . '>Cake order #' . (int) $d['id']
+            . ' · deposit due MWK ' . money((float) $d['deposit_required'] - (float) $d['deposit_received']) . '</option>';
+    }
     layout('Declare payment', '<h1>Declare a payment</h1><div class="card"><form method="post" enctype="multipart/form-data">' . csrf_field() . '
-      ' . field('Invoice', '<select name="invoice_id">' . $opts . '</select>') . '
+      ' . field('Paying for', '<select name="against">' . ($opts ?: '<option value="">— nothing due —</option>') . '</select>') . '
       ' . field('Amount (MWK)', '<input name="amount" required inputmode="decimal">') . '
       ' . field('Method', '<select name="method"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Other Manual</option></select>') . '
       ' . field('Payment reference (bank ref / mobile TxID)', '<input name="reference" required>') . '
