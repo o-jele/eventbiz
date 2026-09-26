@@ -3,8 +3,9 @@
 // payment verification, orders, items/stock, users, reports.
 declare(strict_types=1);
 
-function admin_nav(): string
+function staff_sidebar(): string
 {
+    $u = current_user();
     $groups = [
         'Desk' => [['/admin', 'Dashboard'], ['/admin/enquiries', 'Enquiries'], ['/admin/events', 'Events'],
                    ['/admin/bakery', 'Bakery'], ['/admin/catering', 'Catering'], ['/admin/rentals', 'Rentals']],
@@ -16,18 +17,42 @@ function admin_nav(): string
     $open = (int) (db_one("SELECT COUNT(*) AS c FROM enquiries WHERE status = 'Open'")['c'] ?? 0);
     $pend = (int) (db_one("SELECT COUNT(*) AS c FROM payment_declarations WHERE status IN ('Submitted','Pending Verification')")['c'] ?? 0);
     $hot = ['/admin/enquiries' => $open, '/admin/payments' => $pend];
-    $h = '<nav class="subnav">';
+    $here = parse_url($_SERVER['REQUEST_URI'] ?? '/admin', PHP_URL_PATH) ?: '/admin';
+    $h = '';
     foreach ($groups as $g => $links) {
-        $h .= '<span class="grp">' . $g . '</span>';
+        $h .= '<div class="side-grp"><span>' . $g . '</span>';
         foreach ($links as $link) {
             [$url, $label] = $link;
             $n = $hot[$url] ?? 0;
-            $h .= '<a href="' . $url . '"' . ($n ? ' class="hot"' : '') . '>' . $label . ($n ? ' (' . $n . ')' : '') . '</a>';
+            $active = ($here === $url || ($url !== '/admin' && str_starts_with($here, $url . '/'))) ? ' on' : '';
+            $h .= '<a href="' . $url . '" class="side-link' . ($n ? ' hot' : '') . $active . '">' . $label . ($n ? ' <b>(' . $n . ')</b>' : '') . '</a>';
         }
+        $h .= '</div>';
     }
-    $h .= '<button id="theme-toggle" class="theme-btn" title="Toggle dark mode">◐ Dark</button>';
-    $h .= '<script>(function(){try{var t=localStorage.getItem("glam-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.dataset.theme="dark";}document.getElementById("theme-toggle").onclick=function(){var d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"light":"dark";localStorage.setItem("glam-theme",d?"light":"dark");};}catch(e){}})();</script>';
-    return $h . '</nav>';
+    $name = $u ? $u['name'] : 'Staff';
+    $role = $u ? ucwords(str_replace('_', ' ', $u['role'])) : '';
+    $h .= '<div class="side-foot">'
+        . '<div class="side-user"><span class="avatar-lg sm">' . e(strtoupper(mb_substr($name, 0, 1))) . '</span>'
+        . '<span class="who"><strong>' . e($name) . '</strong><small>' . e($role) . '</small></span></div>'
+        . '<div class="side-row"><button id="theme-toggle" class="theme-btn" title="Toggle dark mode">◐</button>'
+        . '<button id="side-collapse" class="theme-btn" title="Collapse sidebar">⇤</button></div>'
+        . '</div>';
+    $h .= '<script>(function(){try{'
+        . 'var t=localStorage.getItem("glam-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.dataset.theme="dark";}'
+        . 'document.getElementById("theme-toggle").onclick=function(){var d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"light":"dark";localStorage.setItem("glam-theme",d?"light":"dark");};'
+        . 'if(localStorage.getItem("glam-side")==="mini"){document.body.classList.add("side-mini");}'
+        . 'document.getElementById("side-collapse").onclick=function(){document.body.classList.toggle("side-mini");localStorage.setItem("glam-side",document.body.classList.contains("side-mini")?"mini":"full");};'
+        . 'var b=document.getElementById("side-burger");if(b){b.onclick=function(){document.body.classList.toggle("side-open");};}'
+        . 'var sc=document.getElementById("side-close");if(sc){sc.onclick=function(){document.body.classList.remove("side-open");};}'
+        . '}catch(e){}})();</script>';
+    return $h;
+}
+
+function admin_nav(): string
+{
+    // Nav now lives in the staff sidebar (rendered by layout()); kept so
+    // existing pages calling admin_nav() need no changes.
+    return '';
 }
 
 function pg_admin(): void

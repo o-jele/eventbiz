@@ -33,8 +33,9 @@ function layout(string $title, string $body, string $active = ''): void
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
 </head>
-<body>
+<body<?= $isStaff ? ' class="has-side"' : '' ?>>
 <header class="topbar">
+  <?php if ($isStaff): ?><button id="side-burger" aria-label="Open menu">&#9776;</button><?php endif; ?>
   <?= $brandHtml ?>
   <nav>
     <a href="/creations/shop">Shop</a>
@@ -52,12 +53,22 @@ function layout(string $title, string $body, string $active = ''): void
     <?php endif; ?>
   </nav>
 </header>
+<?php if ($isStaff && function_exists('staff_sidebar')): ?>
+<div class="staff-shell">
+  <div class="side-veil" id="side-close"></div>
+  <aside class="sidebar" aria-label="Staff navigation"><?= staff_sidebar() ?></aside>
+  <div class="staff-main">
+<?php endif; ?>
 <main class="wrap">
   <?php if ($flash): ?>
     <p class="flash <?= e($flash['kind']) ?>"><?= e($flash['msg']) ?></p>
   <?php endif; ?>
   <?= $body ?>
 </main>
+<?php if ($isStaff && function_exists('staff_sidebar')): ?>
+  </div>
+</div>
+<?php endif; ?>
 <?php if (GLAM_WHATSAPP !== ''): ?>
 <a class="wa-float" href="https://wa.me/<?= e(GLAM_WHATSAPP) ?>?text=Hello%20Glamorous!" target="_blank" rel="noopener">Chat to order</a>
 <?php endif; ?>
