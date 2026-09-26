@@ -239,7 +239,7 @@ function pg_admin(): void
         $fp = array_merge($fp, $scp);
     }
     if ($af === 'all' || $af === 'payments') {
-        $parts[] = "(SELECT 'payment' AS t, CONCAT(p.method, ' · MWK ', FORMAT(p.amount, 0)) AS d, 'posted' AS s, p.created_at AS c
+        $parts[] = "(SELECT 'payment' AS t, CONCAT(p.method, ' · MK', FORMAT(p.amount, 0)) AS d, 'posted' AS s, p.created_at AS c
           FROM payments p WHERE 1=1" . $co('p') . ')';
         $fp = array_merge($fp, $scp);
     }
@@ -315,11 +315,11 @@ function pg_admin(): void
     }
     $topCustHtml = '';
     foreach ($topCust as $c) {
-        $topCustHtml .= '<li>' . e($c['name']) . ' <span class="t">MWK ' . money((float) $c['t']) . '</span></li>';
+        $topCustHtml .= '<li>' . e($c['name']) . ' <span class="t">MK' . money((float) $c['t']) . '</span></li>';
     }
     $topItemsHtml = '';
     foreach ($topItems as $it) {
-        $topItemsHtml .= '<li>' . e($it['name']) . ' <span class="t">' . (int) $it['q'] . ' sold · MWK ' . money((float) $it['t']) . '</span></li>';
+        $topItemsHtml .= '<li>' . e($it['name']) . ' <span class="t">' . (int) $it['q'] . ' sold · MK' . money((float) $it['t']) . '</span></li>';
     }
 
     layout('Staff', admin_nav()
@@ -340,14 +340,14 @@ function pg_admin(): void
         . $tile(money((float) ($unpaid['t'] ?? 0)), 'owed (' . (int) ($unpaid['n'] ?? 0) . ' invoices)', '/admin/invoices?f=unpaid',
             '', '', ($unpaid['n'] ?? 0) > 0, (float) ($unpaid['t'] ?? 0), 2)
         . '</div>'
-        . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big" data-count="' . $revTotal . '" data-dec="2" data-pre="MWK ">MWK ' . money($revTotal) . '</span>'
+        . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big" data-count="' . $revTotal . '" data-dec="2" data-pre="MK">MK' . money($revTotal) . '</span>'
         . trend_badge(trend_of($revTotal, $revPrev)) . '<span class="mut">vs prior 30d</span></div>'
         . '<div class="dash-grid" style="grid-template-columns:8fr 4fr">'
         . '<div>' . svg_area_chart(array_values($days)) . '</div>'
         . '<div><h4>Sales mix</h4>' . ($mix ? svg_donut($mix) : '<p class="mut">No sales yet.</p>') . '</div>'
         . '</div></div>'
         . '<div class="dash-grid"><div>'
-        . '<div class="panel"><h3>Today</h3><p class="stat-line"><strong>' . (int) ($today['n'] ?? 0) . ' sales</strong> · MWK '
+        . '<div class="panel"><h3>Today</h3><p class="stat-line"><strong>' . (int) ($today['n'] ?? 0) . ' sales</strong> · MK'
         . money((float) ($today['t'] ?? 0)) . ' taken</p>'
         . '<p><a class="btn sec" href="/admin/pos">New counter sale</a> <a class="btn sec" href="/admin/orders">Orders</a></p></div>'
         . ($opsOnly
@@ -524,7 +524,7 @@ function pg_admin_event_view(int $id): void
         }
         db_exec("UPDATE events SET status='Quoted' WHERE id=?", [$id]);
         db()->commit();
-        flash('Quotation #' . $qid . ' created. Total MWK ' . money($sub) . '.');
+        flash('Quotation #' . $qid . ' created. Total MK' . money($sub) . '.');
         redirect('/admin/events?view=' . $id);
     }
     // Convert quotation → sales order + invoice + rental/catering/cake docs (POST only).
@@ -546,7 +546,7 @@ function pg_admin_event_view(int $id): void
           <div class="card"><form method="post">' . csrf_field() . '
           <table class="tbl"><thead><tr><th>Type</th><th>Item</th><th>Description</th><th>Qty</th><th>Rate</th></tr></thead>
           <tbody>' . $rows . '</tbody></table>
-          ' . field('Deposit required (MWK — no fixed %, per agreement)', '<input name="deposit_required" required>') . '
+          ' . field('Deposit required (MK — no fixed %, per agreement)', '<input name="deposit_required" required>') . '
           ' . field('Valid until', '<input type="date" name="valid_until">') . '
           <button class="btn">Generate quotation</button></form></div>');
         return;
@@ -779,7 +779,7 @@ function pg_admin_rental_view(int $id, array $u): void
                 flash($ex->getMessage(), 'err');
                 redirect('/admin/rentals?view=' . $id . '&return=1');
             }
-            flash('Return settled. Refund due MWK ' . money($set['refund_due']) . '.');
+            flash('Return settled. Refund due MK' . money($set['refund_due']) . '.');
             redirect('/admin/rentals?view=' . $id);
         }
         $fr = '';
@@ -794,7 +794,7 @@ function pg_admin_rental_view(int $id, array $u): void
         }
         layout('Return', admin_nav() . '<h1>Return for booking #' . $id . '</h1>
           <div class="card"><form method="post">' . csrf_field() . '
-          <table class="tbl"><thead><tr><th>Item</th><th>Good</th><th>Damaged</th><th>Missing</th><th>Damage MWK</th><th>Missing MWK</th></tr></thead>
+          <table class="tbl"><thead><tr><th>Item</th><th>Good</th><th>Damaged</th><th>Missing</th><th>Damage MK</th><th>Missing MK</th></tr></thead>
           <tbody>' . $fr . '</tbody></table>
           ' . field('Actual return date', '<input type="date" name="return_actual" value="' . date('Y-m-d') . '">') . '
           ' . field('Cleaning charges', '<input name="cleaning" value="0">') . '
@@ -1055,9 +1055,9 @@ function pg_admin_reports(): void
         $pr[] = [e($p['kind']), e($p['method']), (int) $p['n'], money((float) $p['t'])];
     }
     layout('Reports', admin_nav() . '<h1>Reports</h1>
-      <h2>Sales by company</h2>' . ($sr ? table(['Company', 'Orders', 'Total MWK'], $sr) : '<p class="mut">No sales.</p>') . '
+      <h2>Sales by company</h2>' . ($sr ? table(['Company', 'Orders', 'Total MK'], $sr) : '<p class="mut">No sales.</p>') . '
       <h2>Rental utilization</h2>' . ($ur ? table(['Equipment', 'Owned', 'Active bookings', 'Units out'], $ur) : '<p class="mut">No rental items.</p>') . '
       <h2>Customer balances &gt; 0</h2>' . ($br ? table(['Customer', 'Company', 'Balance'], $br) : '<p class="mut">All settled.</p>') . '
-      <h2>Payment declarations by status</h2>' . ($dr ? table(['Status', 'Count', 'Total MWK'], $dr) : '<p class="mut">None.</p>') . '
-      <h2>Posted payments</h2>' . ($pr ? table(['Kind', 'Method', 'Count', 'Total MWK'], $pr) : '<p class="mut">None.</p>'));
+      <h2>Payment declarations by status</h2>' . ($dr ? table(['Status', 'Count', 'Total MK'], $dr) : '<p class="mut">None.</p>') . '
+      <h2>Posted payments</h2>' . ($pr ? table(['Kind', 'Method', 'Count', 'Total MK'], $pr) : '<p class="mut">None.</p>'));
 }

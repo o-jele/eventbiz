@@ -14,7 +14,7 @@ function pg_home(): void
             . item_img($feat['image_path'], $feat['name'])
             . '<span class="hero-feature-tag">Featured</span>'
             . '<strong>' . e($feat['name']) . '</strong>'
-            . '<span class="price">MWK ' . money((float) $feat['price']) . '</span></a>';
+            . '<span class="price">MK' . money((float) $feat['price']) . '</span></a>';
     }
     layout('Welcome', '
     <section class="hero-band"><div class="hero-grid"><div>
@@ -49,7 +49,7 @@ function delights_from(string $group): string
         'SELECT MIN(i.price) AS m FROM items i JOIN item_groups g ON g.id = i.item_group_id
          WHERE g.name = ? AND i.published = 1 AND i.price > 0', [$group]
     );
-    return ($row && (float) $row['m'] > 0) ? 'from MWK ' . money((float) $row['m']) : 'on quotation';
+    return ($row && (float) $row['m'] > 0) ? 'from MK' . money((float) $row['m']) : 'on quotation';
 }
 
 function pg_creations(): void
@@ -86,7 +86,7 @@ function pg_creations(): void
         $cards .= '<div class="card">' . item_img($it['image_path'] ?? null, $it['name'])
             . '<h3>' . e($it['name']) . '</h3>
           <p class="mut">' . e($it['sku']) . '</p>
-          <p class="price">MWK ' . money((float) $it['price']) . '</p>
+          <p class="price">MK' . money((float) $it['price']) . '</p>
           <p>' . $pill . '</p>
           <p><a class="btn" href="/product/' . (int) $it['id'] . '">View</a></p></div>';
     }
@@ -121,7 +121,7 @@ function pg_product(int $id): void
     <p class="mut">' . e($it['sku']) . ' · ' . e($it['uom']) . '</p>
     <p>' . $pill . '</p>
     <p>' . nl2br(e($it['description'] ?? '')) . '</p>
-    <p class="price-big">MWK ' . money((float) $it['price']) . '</p>
+    <p class="price-big">MK' . money((float) $it['price']) . '</p>
     ' . $buy . '</div></div>');
 }
 
@@ -161,7 +161,7 @@ function pg_cart(): void
                     <button class="btn sec">Remove</button></form>'];
     }
     $body = '<h1>Cart</h1>' . ($rows ? table(['Item', 'Qty', 'Rate', 'Amount', ''], $rows)
-        . '<p><strong>Total: MWK ' . money($total) . '</strong></p>
+        . '<p><strong>Total: MK' . money($total) . '</strong></p>
            <p><a class="btn" href="/checkout">Checkout</a>
            <form method="post" action="/cart/clear" style="display:inline">' . csrf_field() . '
            <button class="btn sec">Clear cart</button></form></p>'
@@ -280,7 +280,7 @@ function pg_checkout_success(): void
     layout('Order confirmed', '<h1>Order confirmed ' . brand_badge($o['company']) . '</h1>
       <div class="card"><p>Thank you, ' . e($o['customer']) . '!</p>
       <p>Order <strong>#' . (int) $o['id'] . '</strong> · Invoice <strong>#' . (int) $inv['id'] . '</strong><br>
-      Total: <strong>MWK ' . money((float) $o['grand_total']) . '</strong> · ' . e($o['fulfilment_method']) . '</p>
+      Total: <strong>MK' . money((float) $o['grand_total']) . '</strong> · ' . e($o['fulfilment_method']) . '</p>
       <p>Next: pay by Cash, Bank Transfer or Mobile Money, then
       <a class="btn" href="/declare?invoice_id=' . (int) $inv['id'] . '">declare your payment</a></p>'
       . ($u ? '<p><a href="/my-glamorous">Track it in My Glamorous</a></p>'
@@ -322,7 +322,7 @@ function pg_rentals(): void
     $cards = '';
     foreach ($items as $it) {
         $cards .= '<div class="card"><h3>' . e($it['name']) . '</h3>
-          <p class="mut">Owned: ' . e((string) $it['stock_qty']) . ' · MWK ' . money((float) $it['price']) . ' per event</p>
+          <p class="mut">Owned: ' . e((string) $it['stock_qty']) . ' · MK' . money((float) $it['price']) . ' per event</p>
           <p><a class="btn" href="/delights/request?type=Rental">Request booking</a></p></div>';
     }
     layout('Rentals', '<h1>Equipment rental</h1><p class="mut">Availability is confirmed by staff; deposit depends on your quotation.</p>

@@ -184,7 +184,7 @@ function pg_declare(): void
         $val = 'invoice:' . (int) $i['id'];
         $sel = $against === $val ? ' selected' : '';
         $opts .= '<option value="' . $val . '"' . $sel . '>Invoice #' . (int) $i['id'] . ' · '
-            . e($i['label']) . ' · balance MWK ' . money((float) $i['total'] - (float) $i['paid']) . '</option>';
+            . e($i['label']) . ' · balance MK' . money((float) $i['total'] - (float) $i['paid']) . '</option>';
     }
     $deps = db_all(
         "SELECT id, grand_total, deposit_required, deposit_received FROM rental_bookings
@@ -195,7 +195,7 @@ function pg_declare(): void
         $val = 'rental:' . (int) $d['id'];
         $sel = $against === $val ? ' selected' : '';
         $opts .= '<option value="' . $val . '"' . $sel . '>Rental booking #' . (int) $d['id']
-            . ' · deposit due MWK ' . money((float) $d['deposit_required'] - (float) $d['deposit_received']) . '</option>';
+            . ' · deposit due MK' . money((float) $d['deposit_required'] - (float) $d['deposit_received']) . '</option>';
     }
     $cdeps = db_all(
         "SELECT id, price, deposit_required, deposit_received FROM cake_orders
@@ -206,11 +206,11 @@ function pg_declare(): void
         $val = 'cake:' . (int) $d['id'];
         $sel = $against === $val ? ' selected' : '';
         $opts .= '<option value="' . $val . '"' . $sel . '>Cake order #' . (int) $d['id']
-            . ' · deposit due MWK ' . money((float) $d['deposit_required'] - (float) $d['deposit_received']) . '</option>';
+            . ' · deposit due MK' . money((float) $d['deposit_required'] - (float) $d['deposit_received']) . '</option>';
     }
     layout('Declare payment', '<h1>Declare a payment</h1><div class="card"><form method="post" enctype="multipart/form-data">' . csrf_field() . '
       ' . field('Paying for', '<select name="against">' . ($opts ?: '<option value="">— nothing due —</option>') . '</select>') . '
-      ' . field('Amount (MWK)', '<input name="amount" required inputmode="decimal">') . '
+      ' . field('Amount (MK)', '<input name="amount" required inputmode="decimal">') . '
       ' . field('Method', '<select name="method"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Other Manual</option></select>') . '
       ' . field('Payment reference (bank ref / mobile TxID)', '<input name="reference" required>') . '
       ' . field('Payment date', '<input type="date" name="payment_date" value="' . date('Y-m-d') . '">') . '
@@ -262,8 +262,8 @@ function pg_invoice(int $id): void
       <h2>Invoice #' . (int) $inv['id'] . ' · ' . e($inv['created_at']) . '</h2>
       <p>Bill to: <strong>' . e($inv['customer']) . '</strong> ' . e((string) $inv['phone']) . '<br>' . e($inv['label']) . '</p>'
       . table(['Item', 'Qty', 'Rate', 'Amount'], $lr) . '
-      <p style="text-align:right"><strong>Total: MWK ' . money((float) $inv['total']) . '</strong><br>
-      Paid: MWK ' . money((float) $inv['paid']) . '<br>Balance: MWK ' . money($bal) . ' (' . e($inv['status']) . ')</p>'
+      <p style="text-align:right"><strong>Total: MK' . money((float) $inv['total']) . '</strong><br>
+      Paid: MK' . money((float) $inv['paid']) . '<br>Balance: MK' . money($bal) . ' (' . e($inv['status']) . ')</p>'
       . ($pr ? '<h3>Payments received</h3>' . table(['Date', 'Method', 'Reference', 'Amount'], $pr) : '<p class="mut">No payments recorded yet.</p>')
       . '</div>');
 }

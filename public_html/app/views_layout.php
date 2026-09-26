@@ -45,7 +45,6 @@ function layout(string $title, string $body, string $active = ''): void
     <a class="btn sec" href="/"><?= icon('home') ?> View site</a>
   </nav>
   <?php else: ?>
-  <?= $brandHtml ?>
   <nav>
     <a href="/creations/shop">Shop</a>
     <a href="/delights/cakes">Cakes</a>
@@ -90,7 +89,6 @@ if ($wa !== ''): ?>
   <div class="foot-inner">
     <div>
       <div class="foot-logos"><span><img src="/assets/img/logo-creations.jpg" alt="Glamorous Creations"></span><span><img src="/assets/img/logo-delights.jpg" alt="Glamorous Delights"></span></div>
-      <h4>Glamorous<em style="color:var(--rose)">.</em></h4>
       <p>Baking supplies, custom cakes, catering, rentals &amp; full events — made with love in Lilongwe, Malawi.</p>
     </div>
     <div>

@@ -25,13 +25,13 @@ function pg_admin_bakery(): void
             }
             db_exec("UPDATE cake_orders SET price=?, deposit_required=?, status='Quoted' WHERE id=?",
                 [$price, (float) post('deposit_required'), (int) $k['id']]);
-            flash('Cake order #' . $k['id'] . ' quoted at MWK ' . money($price) . '.');
+            flash('Cake order #' . $k['id'] . ' quoted at MK' . money($price) . '.');
             redirect('/admin/bakery');
         }
         layout('Quote cake', admin_nav() . '<h1>Quote cake order #' . (int) $k['id'] . '</h1>
           <div class="card"><form method="post">' . csrf_field() . '
-          ' . field('Agreed price (MWK)', '<input name="price" required>') . '
-          ' . field('Deposit required (MWK)', '<input name="deposit_required" value="0">') . '
+          ' . field('Agreed price (MK)', '<input name="price" required>') . '
+          ' . field('Deposit required (MK)', '<input name="deposit_required" value="0">') . '
           <button class="btn">Send quotation</button></form></div>');
         return;
     }
@@ -234,7 +234,7 @@ function pg_admin_rental_new(): void
                 [$bid, $l['id'], $l['qty'], $l['rate'], $l['amount']]);
         }
         db()->commit();
-        flash('Booking #' . $bid . ' created (MWK ' . money($grand) . '). Confirm it after deposit.');
+        flash('Booking #' . $bid . ' created (MK' . money($grand) . '). Confirm it after deposit.');
         redirect('/admin/rentals?view=' . $bid);
     }
     $opts = rental_item_options();
@@ -251,7 +251,7 @@ function pg_admin_rental_new(): void
       ' . field('Delivery address', '<textarea name="delivery_address" rows="2"></textarea>') . '
       <table class="tbl"><thead><tr><th>Equipment</th><th>Qty</th></tr></thead><tbody>' . $rows . '</tbody></table>
       ' . field('Delivery charge', '<input name="delivery_charge" value="0">') . '
-      ' . field('Deposit required (MWK — per agreement, no fixed %)', '<input name="deposit_required" value="0">') . '
+      ' . field('Deposit required (MK — per agreement, no fixed %)', '<input name="deposit_required" value="0">') . '
       <button class="btn">Create booking</button></form></div>');
 }
 
@@ -456,14 +456,14 @@ function pg_admin_pos(): void
         <div class="row2">' . field('Name', '<input name="name" value="' . e($cust['name']) . '">') . field('Phone', '<input name="phone" value="' . e($cust['phone']) . '" inputmode="tel">') . '</div>
         <button class="btn sec">Attach</button></form></div>
       <div class="card pos-totals"><h3>Totals</h3>
-        <p>Items: <strong>' . e((string) $t['units']) . '</strong><br>Subtotal: MWK ' . money($t['subtotal'])
-        . '<br>Discount: MWK ' . money($t['discount']) . '</p>
-        <p class="pos-grand">MWK ' . money($t['total']) . '</p></div>
+        <p>Items: <strong>' . e((string) $t['units']) . '</strong><br>Subtotal: MK' . money($t['subtotal'])
+        . '<br>Discount: MK' . money($t['discount']) . '</p>
+        <p class="pos-grand">MK' . money($t['total']) . '</p></div>
       <div class="card"><h3>Take payment</h3>
         <form method="post" action="' . $B . '/complete">' . csrf_field() . '
         ' . field('Method', '<select name="method"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Other Manual</option></select>') . '
         ' . field('Amount tendered (Alt+5)', '<input id="pos-tendered" name="tendered" inputmode="decimal" data-total="' . $t['total'] . '" value="' . $t['total'] . '">') . '
-        <p>Change due: <strong id="pos-change">MWK 0.00</strong></p>
+        <p>Change due: <strong id="pos-change">MK 0.00</strong></p>
         ' . field('Reference (bank/mobile)', '<input name="reference">') . '
         <button class="btn">Complete sale</button></form></div>
     </div></div>
@@ -478,7 +478,7 @@ function pg_admin_pos(): void
         fetch("' . $B . '/suggest?q=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (d) {
           items = d;
           box.innerHTML = d.map(function (it, i) {
-            return "<button type=\'button\' data-i=\'" + i + "\'>" + esc(it.sku) + " — " + esc(it.name) + " <b>MWK " + it.price + "</b> (" + it.stock + " in stock)</button>";
+            return "<button type=\'button\' data-i=\'" + i + "\'>" + esc(it.sku) + " — " + esc(it.name) + " <b>MK" + it.price + "</b> (" + it.stock + " in stock)</button>";
           }).join("");
           box.querySelectorAll("button").forEach(function (b) {
             b.onclick = function () {
@@ -499,7 +499,7 @@ function pg_admin_pos(): void
       function upd() {
         var v = parseFloat((ten.value || "0").replace(/,/g, "")) || 0;
         var c = v - parseFloat(ten.dataset.total || "0");
-        chg.textContent = "MWK " + (c < 0 ? "0.00" : c.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        chg.textContent = "MK" + (c < 0 ? "0.00" : c.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}));
       }
       if (ten) { ten.addEventListener("input", upd); upd(); }
       document.addEventListener("keydown", function (e) {
@@ -654,7 +654,7 @@ function pg_pos_complete(): void
     }
     $tendered = (float) post('tendered', '0');
     if ($tendered < $t['total']) {
-        flash('Tendered MWK ' . money($tendered) . ' is less than the MWK ' . money($t['total']) . ' total.', 'err');
+        flash('Tendered MK' . money($tendered) . ' is less than the MK' . money($t['total']) . ' total.', 'err');
         redirect(pos_base());
     }
     $change = $tendered - $t['total'];
@@ -700,7 +700,7 @@ function pg_pos_complete(): void
         redirect(pos_base());
     }
     unset($_SESSION['pos_cart'], $_SESSION['pos_customer']);
-    flash('Sale #' . $oid . ' complete — invoice #' . $inv . '. Change due: MWK ' . money($change) . '.');
+    flash('Sale #' . $oid . ' complete — invoice #' . $inv . '. Change due: MK' . money($change) . '.');
     redirect('/invoice/' . $inv);
 }
 
@@ -1007,7 +1007,7 @@ function pg_admin_settings(): void
       ' . field('Site name', '<input name="site_name" value="' . e(setting_get('site_name', 'Glamorous')) . '">') . '
       ' . field('WhatsApp number (international digits, e.g. 265991234567 — enables the chat button)', '<input name="whatsapp" value="' . e(setting_get('whatsapp', '')) . '" inputmode="numeric">') . '
       <button class="btn">Save</button></form></div>
-      <p class="mut">Currency is MWK and fixed at install — changing it later needs accountant review.</p>
+      <p class="mut">Currency is MK and fixed at install — changing it later needs accountant review.</p>
       <h2>User accounts</h2>' . table(['#', 'Name', 'Email', 'Role', 'Active'], $tr) . '
       <h3>New staff login</h3><div class="card"><form method="post">' . csrf_field() . '<input type="hidden" name="new_user" value="1">
       ' . field('Name', '<input name="name" required>') . field('Email', '<input type="email" name="email" required>') . '
