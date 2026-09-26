@@ -357,11 +357,13 @@ function pg_admin(): void
         . $tile(number_format((float) ($unpaid['t'] ?? 0)), 'owed (' . (int) ($unpaid['n'] ?? 0) . ' invoices)', '/admin/invoices?f=unpaid',
             '', ($unpaid['n'] ?? 0) > 0, (float) ($unpaid['t'] ?? 0), 0, 'MK')
         . '</div>'
+        . '<div class="dash-grid rev-grid">'
         . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big" data-count="' . $revTotal . '" data-dec="0" data-pre="MK">MK' . number_format($revTotal) . '</span>'
         . trend_badge(trend_of($revTotal, $revPrev)) . '<span class="mut">vs prior 30d</span></div>'
         . svg_area_chart(array_values($days)) . '</div>'
         . '<div class="panel chart-card"><h3>Sales mix · last 30 days</h3>'
         . ($mix ? svg_donut($mix) : '<p class="mut">No sales yet.</p>') . '</div>'
+        . '</div>'
         . '<div class="dash-grid"><div>'
         . '<div class="panel"><h3>Today</h3><p class="stat-line"><strong>' . (int) ($today['n'] ?? 0) . ' sales</strong> · MK'
         . number_format((float) ($today['t'] ?? 0)) . ' taken</p>'

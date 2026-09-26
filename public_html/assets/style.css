@@ -274,7 +274,8 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .feed li { padding: .55rem 0; border-bottom: 1px dashed var(--line); font-size: .93rem; }
 .feed li:last-child { border-bottom: 0; }
 .feed .t { color: var(--mut); font-size: .8rem; }
-@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+.rev-grid { grid-template-columns: 8fr 4fr; }
+@media (max-width: 900px) { .dash-grid, .rev-grid { grid-template-columns: 1fr; } }
 
 /* ---------- counter-sale register ---------- */
 .pos-grid { display: grid; grid-template-columns: 8fr 5fr; gap: 1.2rem; align-items: start; }
