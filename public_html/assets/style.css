@@ -342,6 +342,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 }
 [data-theme="dark"] body { background: var(--cream); color: var(--ink); }
 [data-theme="dark"] .topbar { background: rgba(23, 18, 33, .92); }
+[data-theme="dark"] body.has-side .topbar { background: #171221; backdrop-filter: none; }
 [data-theme="dark"] .topbar nav a, [data-theme="dark"] .brand { color: var(--ink); }
 [data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
 [data-theme="dark"] .card .price, [data-theme="dark"] .product .price-big,
@@ -447,8 +448,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   body.has-side .staff-shell { display: block; }
   body.has-side .staff-main { margin-left: 248px; min-width: 0; }
   body.has-side.side-mini .staff-main { margin-left: 78px; }
+  body.has-side .topbar { background: var(--cream); backdrop-filter: none; }
   body.has-side .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 248px; z-index: 60;
+    position: fixed; left: 0; top: 0; bottom: 0; width: 248px; z-index: 40;
     background: var(--card); border-right: 1px solid var(--line);
     padding: 1rem .9rem; overflow-y: auto;
     display: flex; flex-direction: column; gap: .2rem;
@@ -470,7 +472,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   #side-burger { display: block; }
   body.has-side .sidebar {
     position: fixed; left: 0; top: 0; bottom: 0; width: 272px; z-index: 40;
-    padding-top: 66px;
+    padding-top: 64px;
     background: var(--card); border-right: 1px solid var(--line);
     padding: 1.1rem .9rem; overflow-y: auto;
     display: flex; flex-direction: column; gap: .2rem;
