@@ -31,6 +31,14 @@ function layout(string $title, string $body, string $active = ''): void
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#DE7FB8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})});}</script>
 <script>try{var _t=localStorage.getItem("glam-theme");if(_t==="dark"||(!_t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.dataset.theme="dark";}document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("theme-toggle");function icons(){var s=document.getElementById("theme-icon-sun"),m=document.getElementById("theme-icon-moon");if(s&&m){var dark=document.documentElement.dataset.theme==="dark";s.style.display=dark?"none":"";m.style.display=dark?"":"none";}}if(b){b.onclick=function(){var d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"light":"dark";try{localStorage.setItem("glam-theme",d?"light":"dark");}catch(e){}icons();};}icons();});}catch(e){}</script>
 </head>
 <body<?= $staffChrome ? ' class="has-side"' : '' ?>>

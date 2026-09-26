@@ -41,35 +41,37 @@ function svg_sparkline(array $vals, int $w = 110, int $h = 30, string $color = '
         . '<polyline points="' . implode(' ', $pts) . '" fill="none" stroke="' . $color . '" stroke-width="2" stroke-linecap="round"/></svg>';
 }
 
-/** $days: list of ['label' => '26 Sep', 'value' => 123]. */
-function svg_area_chart(array $days): string
+/** $buckets: list of ['label' => 'Wk 7 Sep', 'value' => 123]. */
+function svg_bars(array $buckets): string
 {
     $w = 620;
     $h = 170;
-    $padL = 8;
     $padB = 20;
-    $vals = array_column($days, 'value');
-    $n = count($days);
+    $n = count($buckets);
     if (!$n) {
         return '<p class="mut">No sales yet.</p>';
     }
-    $max = max(1, max($vals));
-    $pts = [];
-    foreach ($vals as $i => $v) {
-        $x = round($padL + $i / max(1, $n - 1) * ($w - $padL - 8), 1);
-        $y = round($h - $padB - ($v / $max) * ($h - $padB - 12), 1);
-        $pts[] = [$x, $y];
+    $max = max(1, max(array_column($buckets, 'value')));
+    $slot = ($w - 16) / $n;
+    $bw = max(5, $slot - 7);
+    $s = '';
+    foreach ($buckets as $i => $b) {
+        $bh = ($b['value'] / $max) * ($h - $padB - 26);
+        $x = 8 + $i * $slot + ($slot - $bw) / 2;
+        $y = $h - $padB - $bh;
+        $s .= '<rect x="' . round($x, 1) . '" y="' . round($y, 1) . '" width="' . round($bw, 1) . '" height="' . round(max(0, $bh), 1)
+            . '" rx="4" fill="#DE7FB8"><title>' . e($b['label']) . ': MK' . number_format((float) $b['value']) . '</title></rect>';
     }
-    $sp = array_map(fn($p) => $p[0] . ',' . $p[1], $pts);
-    $area = $padL . ',' . ($h - $padB) . ' ' . implode(' ', $sp) . ' ' . ($w - 8) . ',' . ($h - $padB);
-    return '<svg class="chart" viewBox="0 0 ' . $w . ' ' . $h . '" preserveAspectRatio="none" style="width:100%;height:auto;display:block" role="img">'
-        . '<defs><linearGradient id="revfill" x1="0" y1="0" x2="0" y2="1">'
-        . '<stop offset="0" stop-color="#DE7FB8" stop-opacity=".45"/><stop offset="1" stop-color="#DE7FB8" stop-opacity=".05"/>'
-        . '</linearGradient></defs>'
-        . '<polygon points="' . $area . '" fill="url(#revfill)"/>'
-        . '<polyline points="' . implode(' ', $sp) . '" fill="none" stroke="#DE7FB8" stroke-width="2.5"/>'
-        . '<text x="' . $padL . '" y="' . ($h - 5) . '" font-size="10" fill="#8A7584">' . e($days[0]['label']) . '</text>'
-        . '<text x="' . ($w - 8) . '" y="' . ($h - 5) . '" font-size="10" fill="#8A7584" text-anchor="end">' . e($days[$n - 1]['label']) . '</text></svg>';
+    $labels = '';
+    foreach ($buckets as $i => $b) {
+        $x = 8 + $i * $slot + $slot / 2;
+        if ($n > 9 && $i % 2 === 1) {
+            continue;
+        }
+        $labels .= '<text x="' . round($x, 1) . '" y="' . ($h - 5) . '" font-size="10" fill="#8A7584" text-anchor="middle">' . e($b['label']) . '</text>';
+    }
+    return '<svg class="chart bars" viewBox="0 0 ' . $w . ' ' . $h . '" preserveAspectRatio="none" style="width:100%;height:auto;display:block" role="img">'
+        . $s . $labels . '</svg>';
 }
 
 /** $parts: list of ['label' =>, 'value' =>, 'color' =>]. */

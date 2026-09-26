@@ -150,24 +150,47 @@ function pg_admin(): void
         $pay7 += (float) ($payMap[$d]['t'] ?? 0);
     }
 
-    // Revenue 30d + prior 30d.
-    $days = [];
-    for ($i = 29; $i >= 0; $i--) {
-        $d = date('Y-m-d', strtotime("-$i days"));
-        $days[$d] = ['label' => date('j M', strtotime($d)), 'value' => 0];
+    // Revenue per week: previous full month + current month to date.
+    $spanStart = date('Y-m-01', strtotime('first day of previous month'));
+    $buckets = [];
+    $worder = [];
+    $cur = $spanStart;
+    $spanEnd = date('Y-m-d');
+    while ($cur <= $spanEnd) {
+        $ts = strtotime($cur);
+        $wk = date('o', $ts) . '-W' . date('W', $ts);
+        if (!isset($buckets[$wk])) {
+            $buckets[$wk] = ['label' => 'Wk ' . date('j M', $ts), 'value' => 0];
+            $worder[] = $wk;
+        }
+        $cur = date('Y-m-d', strtotime($cur . ' +1 day'));
     }
     foreach (db_all(
         'SELECT DATE(created_at) AS d, COALESCE(SUM(grand_total),0) AS t FROM sales_orders
-         WHERE created_at >= CURDATE() - INTERVAL 29 DAY' . $co('sales_orders') . ' GROUP BY DATE(created_at)', $scp
+         WHERE DATE(created_at) >= ?' . $co('sales_orders') . ' GROUP BY DATE(created_at)',
+        array_merge([$spanStart], $scp)
     ) as $r) {
-        if (isset($days[$r['d']])) {
-            $days[$r['d']]['value'] = (float) $r['t'];
+        $ts = strtotime($r['d']);
+        $wk = date('o', $ts) . '-W' . date('W', $ts);
+        if (isset($buckets[$wk])) {
+            $buckets[$wk]['value'] += (float) $r['t'];
         }
     }
-    $revTotal = array_sum(array_column($days, 'value'));
-    $revPrev = (float) (db_one(
+    $weeks = [];
+    foreach ($worder as $wk) {
+        $weeks[] = $buckets[$wk];
+    }
+    $revTotal = array_sum(array_column($weeks, 'value'));
+    $dom = (int) date('j');
+    $mtdCur = (float) (db_one(
         'SELECT COALESCE(SUM(grand_total),0) AS t FROM sales_orders
-         WHERE created_at BETWEEN CURDATE() - INTERVAL 59 DAY AND CURDATE() - INTERVAL 30 DAY' . $co('sales_orders'), $scp
+         WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())' . $co('sales_orders'), $scp
+    )['t'] ?? 0);
+    $mtdPrev = (float) (db_one(
+        'SELECT COALESCE(SUM(grand_total),0) AS t FROM sales_orders
+         WHERE YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)
+           AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)
+           AND DAY(created_at) <= ' . $dom . $co('sales_orders'), $scp
     )['t'] ?? 0);
 
     // Sales mix donut (30d).
@@ -373,15 +396,15 @@ function pg_admin(): void
             trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0, (float) $open, 0, '')
         . $tile(number_format((float) ($pend['t'] ?? 0)), 'to verify (' . (int) ($pend['n'] ?? 0) . ')', '/admin/payments',
             trend_badge(trend_of((float) $pay7, (float) ($pPrev['t'] ?? 0))), ($pend['n'] ?? 0) > 0, (float) ($pend['t'] ?? 0), 0, 'MK')
-        . $tile(number_format($revTotal), 'revenue 30 days', '/admin/reports',
-            trend_badge(trend_of($revTotal, $revPrev)), true, $revTotal, 0, 'MK')
+        . $tile(number_format($revTotal), 'weekly revenue', '/admin/reports',
+            trend_badge(trend_of($mtdCur, $mtdPrev)), true, $revTotal, 0, 'MK')
         . $tile(number_format((float) ($unpaid['t'] ?? 0)), 'owed (' . (int) ($unpaid['n'] ?? 0) . ' invoices)', '/admin/invoices?f=unpaid',
             '', ($unpaid['n'] ?? 0) > 0, (float) ($unpaid['t'] ?? 0), 0, 'MK')
         . '</div>'
         . '<div class="dash-grid rev-grid">'
-        . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big" data-count="' . $revTotal . '" data-dec="0" data-pre="MK">MK' . number_format($revTotal) . '</span>'
-        . trend_badge(trend_of($revTotal, $revPrev)) . '<span class="mut">vs prior 30d</span></div>'
-        . svg_area_chart(array_values($days)) . '</div>'
+        . '<div class="panel chart-card"><h3>Revenue · per week</h3><div class="chart-meta"><span class="big" data-count="' . $revTotal . '" data-dec="0" data-pre="MK">MK' . number_format($revTotal) . '</span>'
+        . trend_badge(trend_of($mtdCur, $mtdPrev)) . '<span class="mut">this month vs last (MTD)</span></div>'
+        . svg_bars($weeks) . '</div>'
         . '<div class="panel chart-card"><h3>Sales mix · last 30 days</h3>'
         . ($mix ? svg_donut($mix) : '<p class="mut">No sales yet.</p>') . '</div>'
         . '</div>'
