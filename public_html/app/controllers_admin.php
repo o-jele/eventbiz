@@ -294,13 +294,18 @@ function pg_admin(): void
         $day = substr((string) $f['c'], 0, 10);
         $dayLabel = $day === date('Y-m-d') ? 'Today' : ($day === date('Y-m-d', strtotime('-1 day')) ? 'Yesterday' : $day);
         if ($dayLabel !== $lastDay) {
-            $feedHtml .= '</ul><h4 style="margin:.8rem 0 .2rem">' . e($dayLabel) . '</h4><ul class="feed">';
+            if ($lastDay !== '') {
+                $feedHtml .= '</ul>';
+            }
+            $feedHtml .= '<h4 style="margin:.8rem 0 .2rem">' . e($dayLabel) . '</h4><ul class="feed">';
             $lastDay = $dayLabel;
         }
         $feedHtml .= '<li><div class="feed-item"><span class="fava t-' . e($f['t']) . '">' . strtoupper(e(substr($f['t'], 0, 1))) . '</span>'
             . '<div>' . e($f['d']) . ' ' . $badge((string) $f['s']) . '<br><span class="t">' . e($f['c']) . '</span></div></div></li>';
     }
-    $feedHtml = $feedHtml ? '<ul class="feed" style="display:none"></ul>' . $feedHtml . '</ul>' : '';
+    if ($feedHtml !== '') {
+        $feedHtml .= '</ul>';
+    }
     $tabs = '';
     foreach (['all' => 'All', 'orders' => 'Orders', 'payments' => 'Payments', 'bookings' => 'Bookings'] as $k => $label) {
         $tabs .= '<a href="/admin?af=' . $k . '" class="' . ($af === $k ? 'on' : '') . '">' . $label . '</a>';
@@ -323,7 +328,7 @@ function pg_admin(): void
 
     layout('Staff', admin_nav()
         . '<div class="greet-row"><div>'
-        . '<div><h1>' . $greet . ', <span class="grad-text">' . e($u['name']) . '</span></h1>'
+        . '<h1>' . $greet . ', <span class="grad-text">' . e($u['name']) . '</span></h1>'
         . '<p class="mut" style="margin:0">' . date('l, j F Y') . ' · here is your business at a glance.</p></div></div>'
         . '<div class="quick-actions"><a class="btn sec" href="/admin/pos">Creations</a>'
         . '<a class="btn sec" href="/admin/bakery">Bakery</a>'
