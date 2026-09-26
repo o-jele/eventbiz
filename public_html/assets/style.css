@@ -419,6 +419,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .side-user .who a { font-size: .8rem; }
 .avatar-lg.sm { width: 2.2rem; height: 2.2rem; font-size: 1rem; }
 .side-row { display: flex; gap: .5rem; }
+.side-parent { display: flex; align-items: center; gap: .1rem; }
+.side-parent .side-link { flex: 1; }
+.caret { background: none; border: 0; cursor: pointer; color: var(--mut); font-size: .85rem; padding: .45rem .55rem; border-radius: 8px; transition: transform .2s ease; line-height: 1; }
+.caret:hover { color: var(--rose-deep); background: var(--blush); }
+.side-sub.open .caret { transform: rotate(90deg); }
+.side-kids { display: none; margin-left: 1.35rem; border-left: 2px solid var(--line); padding-left: .35rem; }
+.side-sub.open .side-kids { display: block; }
+.side-link.sub { font-size: .88rem; padding: .42rem .7rem; }
 .staff-top { display: flex; align-items: center; gap: .7rem; }
 .staff-top .btn { display: inline-flex; align-items: center; }
 .btn svg, .theme-btn svg { vertical-align: -3px; }
@@ -436,7 +444,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   body.has-side.side-mini .sidebar { width: 78px; }
   body.has-side.side-mini .sidebar .side-grp > span,
   body.has-side.side-mini .sidebar .side-link .lbl,
-  body.has-side.side-mini .sidebar .side-user .who { display: none; }
+  body.has-side.side-mini .sidebar .side-user .who,
+  body.has-side.side-mini .sidebar .caret { display: none; }
   body.has-side.side-mini .side-link { justify-content: center; padding: .6rem .2rem; }
   body.has-side.side-mini .side-user { justify-content: center; }
   body.has-side.side-mini .side-row { justify-content: center; }

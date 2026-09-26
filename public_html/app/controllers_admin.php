@@ -7,16 +7,29 @@ function staff_sidebar(): string
 {
     $u = current_user();
     $groups = [
-        'Desk' => [['/admin', 'Dashboards', 'dashboard'], ['/admin/enquiries', 'Enquiries', 'enquiries'],
-                   ['/admin/pos', 'Creations POS', 'pos'], ['/admin/bakery-pos', 'Bakery POS', 'bakery'],
-                   ['/admin/events', 'Events', 'events'], ['/admin/catering', 'Catering', 'catering'],
-                   ['/admin/rentals', 'Rentals', 'rentals']],
-        'Money' => [['/admin/payments', 'Payments', 'payments'], ['/admin/orders', 'Orders', 'orders'],
-                    ['/admin/quotations', 'Quotations', 'quotations'], ['/admin/invoices', 'Invoices', 'invoices']],
-        'Stock' => [['/admin/items', 'Items', 'items'], ['/admin/purchases', 'Purchasing', 'purchasing'],
-                    ['/admin/transfers', 'Transfers', 'transfers'], ['/admin/warehouse', 'Warehouse', 'warehouse']],
-        'Setup' => [['/admin/reports', 'Reports', 'reports'],
-                    ['/admin/settings', 'Settings', 'settings']],
+        'Desk' => [
+            ['url' => '/admin', 'label' => 'Dashboards', 'icon' => 'dashboard'],
+            ['url' => '/admin/enquiries', 'label' => 'Enquiries', 'icon' => 'enquiries'],
+            ['label' => 'POS', 'icon' => 'pos', 'default' => '/admin/pos', 'children' => [
+                ['/admin/pos', 'Creations'], ['/admin/bakery-pos', 'Bakery']]],
+            ['url' => '/admin/events', 'label' => 'Events', 'icon' => 'events'],
+            ['url' => '/admin/catering', 'label' => 'Catering', 'icon' => 'catering'],
+            ['url' => '/admin/rentals', 'label' => 'Rentals', 'icon' => 'rentals'],
+        ],
+        'Money' => [
+            ['url' => '/admin/payments', 'label' => 'Payments', 'icon' => 'payments'],
+            ['label' => 'Orders', 'icon' => 'orders', 'default' => '/admin/orders', 'children' => [
+                ['/admin/orders', 'Orders'], ['/admin/quotations', 'Quotations'], ['/admin/invoices', 'Invoices']]],
+        ],
+        'Stock' => [
+            ['url' => '/admin/items', 'label' => 'Items', 'icon' => 'items'],
+            ['label' => 'Warehouse', 'icon' => 'warehouse', 'default' => '/admin/warehouse', 'children' => [
+                ['/admin/transfers', 'Transfers'], ['/admin/purchases', 'Purchasing']]],
+        ],
+        'Setup' => [
+            ['url' => '/admin/reports', 'label' => 'Reports', 'icon' => 'reports'],
+            ['url' => '/admin/settings', 'label' => 'Settings', 'icon' => 'settings'],
+        ],
     ];
     $open = (int) (db_one("SELECT COUNT(*) AS c FROM enquiries WHERE status = 'Open'")['c'] ?? 0);
     $pend = (int) (db_one("SELECT COUNT(*) AS c FROM payment_declarations WHERE status IN ('Submitted','Pending Verification')")['c'] ?? 0);
@@ -26,11 +39,28 @@ function staff_sidebar(): string
     foreach ($groups as $g => $links) {
         $h .= '<div class="side-grp"><span>' . $g . '</span>';
         foreach ($links as $link) {
-            [$url, $label, $ic] = $link;
-            $n = $hot[$url] ?? 0;
-            $active = ($here === $url || ($url !== '/admin' && str_starts_with($here, $url . '/'))) ? ' on' : '';
-            $h .= '<a href="' . $url . '" class="side-link' . ($n ? ' hot' : '') . $active . '">'
-                . '<span class="ico">' . icon($ic) . '</span><span class="lbl">' . $label . ($n ? ' <b>(' . $n . ')</b>' : '') . '</span></a>';
+            if (isset($link['children'])) {
+                $kidUrls = array_column($link['children'], 0);
+                $isOpen = in_array($here, $kidUrls, true) || $here === $link['default']
+                    || str_starts_with($here, $link['default'] . '/');
+                $h .= '<div class="side-sub' . ($isOpen ? ' open' : '') . '" data-sub="' . e($link['label']) . '">'
+                    . '<div class="side-parent"><a href="' . $link['default'] . '" class="side-link' . ($isOpen ? ' on' : '') . '">'
+                    . '<span class="ico">' . icon($link['icon']) . '</span><span class="lbl">' . $link['label'] . '</span></a>'
+                    . '<button class="caret" data-caret aria-label="Expand">▸</button></div>'
+                    . '<div class="side-kids">';
+                foreach ($link['children'] as $kid) {
+                    [$url, $label] = $kid;
+                    $on = ($here === $url || str_starts_with($here, $url . '/')) ? ' on' : '';
+                    $h .= '<a href="' . $url . '" class="side-link sub' . $on . '"><span class="lbl">' . $label . '</span></a>';
+                }
+                $h .= '</div></div>';
+            } else {
+                [$url, $label, $ic] = [$link['url'], $link['label'], $link['icon']];
+                $n = $hot[$url] ?? 0;
+                $active = ($here === $url || ($url !== '/admin' && str_starts_with($here, $url . '/'))) ? ' on' : '';
+                $h .= '<a href="' . $url . '" class="side-link' . ($n ? ' hot' : '') . $active . '">'
+                    . '<span class="ico">' . icon($ic) . '</span><span class="lbl">' . $label . ($n ? ' <b>(' . $n . ')</b>' : '') . '</span></a>';
+            }
         }
         $h .= '</div>';
     }
@@ -48,6 +78,11 @@ function staff_sidebar(): string
         . 'document.getElementById("side-collapse").onclick=function(){document.body.classList.toggle("side-mini");localStorage.setItem("glam-side",document.body.classList.contains("side-mini")?"mini":"full");};'
         . 'var b=document.getElementById("side-burger");if(b){b.onclick=function(){document.body.classList.toggle("side-open");};}'
         . 'var sc=document.getElementById("side-close");if(sc){sc.onclick=function(){document.body.classList.remove("side-open");};}'
+        . 'document.querySelectorAll("[data-caret]").forEach(function(b){b.onclick=function(){var d=b.closest(".side-sub");d.classList.toggle("open");'
+        . 'try{var o=JSON.parse(localStorage.getItem("glam-sub")||"[]");var k=d.dataset.sub;'
+        . 'if(d.classList.contains("open")){if(o.indexOf(k)<0)o.push(k);}else{o=o.filter(function(x){return x!==k;});}'
+        . 'localStorage.setItem("glam-sub",JSON.stringify(o));}catch(e){}};});'
+        . 'try{var oo=JSON.parse(localStorage.getItem("glam-sub")||"[]");oo.forEach(function(k){var dd=document.querySelector(\'[data-sub="\' + k + \'"]\');if(dd)dd.classList.add("open");});}catch(e){}'
         . '}catch(e){}})();</script>';
     return $h;
 }
