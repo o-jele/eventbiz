@@ -284,7 +284,7 @@ function pg_admin(): void
     foreach ($upcoming as $v) {
         $inDays = (int) ((strtotime($v['event_date']) - strtotime(date('Y-m-d'))) / 86400);
         $upHtml .= '<li><a href="/admin/events?view=' . (int) $v['id'] . '">' . e($v['name']) . '</a>'
-            . '<br><span class="t">' . e($v['event_date']) . ' · in ' . $inDays . 'd · ' . e($v['customer']) . ' · ' . e($v['status']) . '</span></li>';
+            . '<br><span class="t">' . e($v['event_date']) . ' · in ' . $inDays . ' days · ' . e($v['customer']) . ' · ' . e($v['status']) . '</span></li>';
     }
     $outHtml = '';
     foreach ($out as $b) {
@@ -352,8 +352,8 @@ function pg_admin(): void
             trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0, (float) $open, 0, '')
         . $tile(number_format((float) ($pend['t'] ?? 0)), 'to verify (' . (int) ($pend['n'] ?? 0) . ')', '/admin/payments',
             trend_badge(trend_of((float) $pay7, (float) ($pPrev['t'] ?? 0))), ($pend['n'] ?? 0) > 0, (float) ($pend['t'] ?? 0), 0, 'MK')
-        . $tile(number_format($revTotal), 'revenue 30d', '/admin/reports',
-            trend_badge(trend_of($revTotal, $revPrev)), false, $revTotal, 0, 'MK')
+        . $tile(number_format($revTotal), 'revenue 30 days', '/admin/reports',
+            trend_badge(trend_of($revTotal, $revPrev)), true, $revTotal, 0, 'MK')
         . $tile(number_format((float) ($unpaid['t'] ?? 0)), 'owed (' . (int) ($unpaid['n'] ?? 0) . ' invoices)', '/admin/invoices?f=unpaid',
             '', ($unpaid['n'] ?? 0) > 0, (float) ($unpaid['t'] ?? 0), 0, 'MK')
         . '</div>'

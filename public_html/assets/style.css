@@ -453,7 +453,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .side-row { display: flex; gap: .5rem; }
 .section-tabs { margin-bottom: 1rem; }
 .staff-top { display: flex; align-items: center; gap: .7rem; }
-.staff-top .btn { display: inline-flex; align-items: center; }
+.staff-top .btn { display: inline-flex; align-items: center; padding: .55rem 1.5rem; white-space: nowrap; }
 .btn svg, .theme-btn svg { vertical-align: -3px; }
 .theme-btn.icon-btn { display: inline-flex; align-items: center; padding: .45rem .7rem; }
 .side-brand {
