@@ -15,6 +15,7 @@
   --mut: #8A7584;
   --line: #F3D3E2;
   --card: #FFFFFF;
+  --bar: #F8ECD2;
   --sage: #7D9B76;
   --shadow: 0 10px 30px rgba(190, 70, 130, .12);
   --shadow-sm: 0 4px 14px rgba(190, 70, 130, .08);
@@ -50,7 +51,7 @@ a { color: var(--rose-deep); }
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
   padding: .7rem 1.2rem;
-  background: rgba(255, 249, 244, .92);
+  background: rgba(248, 236, 210, .94);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
   box-shadow: 0 4px 14px rgba(190, 70, 130, .08);
@@ -449,7 +450,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   body.has-side .staff-shell { display: block; }
   body.has-side .staff-main { margin-left: 248px; min-width: 0; }
   body.has-side.side-mini .staff-main { margin-left: 78px; }
-  body.has-side .topbar { background: var(--cream); backdrop-filter: none; }
+  body.has-side .topbar { background: var(--bar); backdrop-filter: none; }
   body.has-side .sidebar {
     position: fixed; left: 0; top: 0; bottom: 0; width: 248px; z-index: 40;
     background: var(--card); border-right: 1px solid var(--line);
