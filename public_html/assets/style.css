@@ -312,10 +312,9 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .chart-card { padding: 1.2rem 1.3rem; }
 .chart-meta { display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: baseline; margin-bottom: .6rem; }
 .chart-meta .big { font-size: 1.7rem; font-weight: 700; color: var(--wine); }
-.donut-wrap { display: flex; gap: 1rem; align-items: center; }
-.legend { list-style: none; margin: 0; padding: 0; font-size: .9rem; }
-.legend li { margin: .3rem 0; }
-.legend .dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .4rem; }
+.donut-top { display: flex; justify-content: center; }
+.legend-row { list-style: none; margin: .9rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; justify-content: center; font-size: .9rem; }
+.legend-row .dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .4rem; }
 .cal-nav { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .7rem; }
 .cal-month { display: grid; grid-template-columns: repeat(7, 1fr); gap: .25rem; margin-bottom: .9rem; }
 .cal-dow { text-align: center; font-size: .7rem; font-weight: 700; color: var(--mut); text-transform: uppercase; }

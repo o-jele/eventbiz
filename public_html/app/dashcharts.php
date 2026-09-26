@@ -99,7 +99,7 @@ function svg_donut(array $parts): string
             . ' <strong>' . round($p['value'] / $total * 100) . '%</strong></li>';
     }
     $big = $total >= 1000000 ? round($total / 1000000, 1) . 'M' : round($total / 1000) . 'k';
-    return '<div class="donut-wrap"><svg width="140" height="140" viewBox="0 0 140 140" role="img">' . $segs
-        . '<text x="70" y="77" text-anchor="middle" font-size="18" font-weight="700" fill="#241A21">' . $big . '</text></svg>'
-        . '<ul class="legend">' . $leg . '</ul></div>';
+    return '<div class="donut-top"><svg width="150" height="150" viewBox="0 0 140 140" role="img">' . $segs
+        . '<text x="70" y="77" text-anchor="middle" font-size="18" font-weight="700" fill="#241A21">' . $big . '</text></svg></div>'
+        . '<ul class="legend-row">' . $leg . '</ul>';
 }
