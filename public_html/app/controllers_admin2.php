@@ -435,7 +435,7 @@ function pg_admin_pos(): void
     foreach ($today as $x) {
         $tr[] = ['#' . $x['id'], e($x['customer']), money((float) $x['grand_total'])];
     }
-    layout('Counter sale', admin_nav() . '<h1>' . e($cfg['title']) . ' ' . brand_badge($cfg['company']) . '</h1>
+    layout('Counter sale', admin_nav() . section_tabs([['/admin/pos', 'Creations'], ['/admin/bakery-pos', 'Bakery']]) . '<h1>' . e($cfg['title']) . ' ' . brand_badge($cfg['company']) . '</h1>
     <div class="pos-grid"><div>
       <div class="card"><h3>Find or scan item <span class="mut small">(Alt+1)</span></h3>
         <input id="pos-search" placeholder="Type SKU or name…" autocomplete="off">
@@ -806,7 +806,7 @@ function pg_admin_purchases(): void
     foreach ($plist as $p) {
         $ptr[] = [brand_badge($p['company']), '#' . $p['id'], e($p['supplier']), money((float) $p['total']), e($p['created_at'])];
     }
-    layout('Purchasing', admin_nav() . '<h1>Purchasing</h1>
+    layout('Purchasing', admin_nav() . section_tabs([['/admin/warehouse', 'Warehouse'], ['/admin/transfers', 'Transfers'], ['/admin/purchases', 'Purchasing']]) . '<h1>Purchasing</h1>
       <h2>Receive goods</h2><div class="card"><form method="post">' . csrf_field() . '
       <input type="hidden" name="new_purchase" value="1">
       ' . field('Supplier', '<select name="supplier_id">' . ($sopts ?: '<option value="">— add one below —</option>') . '</select>') . '
@@ -922,7 +922,7 @@ function pg_admin_transfers(): void
                  brand_badge($r['fc']) . ' ' . e($r['fw']) . ' → ' . brand_badge($r['tc']) . ' ' . e($r['tw']),
                  money((float) $r['amount']), e((string) ($r['reference'] ?? ''))];
     }
-    layout('Transfers', admin_nav() . '<h1>Intercompany transfers</h1>
+    layout('Transfers', admin_nav() . section_tabs([['/admin/warehouse', 'Warehouse'], ['/admin/transfers', 'Transfers'], ['/admin/purchases', 'Purchasing']]) . '<h1>Intercompany transfers</h1>
       <p class="mut">Explicit GC↔GD moves with a paper trail. Same-company moves belong in Items → Adjust.</p>
       <div class="card"><form method="post">' . csrf_field() . '
       <div class="row2">' . field('From warehouse', '<select name="from_warehouse">' . $opts . '</select>') . field('To warehouse', '<select name="to_warehouse">' . $opts . '</select>') . '</div>
@@ -965,7 +965,7 @@ function pg_admin_invoices(): void
                  e($r['customer']), money((float) $r['total']), money((float) $r['paid']),
                  money($bal), e($r['status'])];
     }
-    layout('Invoices', admin_nav() . '<h1>Invoices</h1>
+    layout('Invoices', admin_nav() . section_tabs([['/admin/orders', 'Orders'], ['/admin/quotations', 'Quotations'], ['/admin/invoices', 'Invoices']]) . '<h1>Invoices</h1>
       <p class="mut">Filter: <a href="/admin/invoices">all</a> · <a href="/admin/invoices?f=unpaid">unpaid only</a></p>' .
         ($tr ? table(['Brand', '#', 'Customer', 'Total', 'Paid', 'Balance', 'Status'], $tr) : '<p class="mut">No invoices.</p>'));
 }
@@ -1038,7 +1038,7 @@ function pg_admin_quotations(): void
                  '<a href="/admin/events?view=' . (int) $r['event_id'] . '">#' . (int) $r['id'] . ' ' . e($r['event']) . '</a>',
                  e($r['customer']), money((float) $r['grand_total']), money((float) $r['deposit_required']), e($r['status'])];
     }
-    layout('Quotations', admin_nav() . '<h1>Quotations</h1>
+    layout('Quotations', admin_nav() . section_tabs([['/admin/orders', 'Orders'], ['/admin/quotations', 'Quotations'], ['/admin/invoices', 'Invoices']]) . '<h1>Quotations</h1>
       <p class="mut">Filter: <a href="/admin/quotations">all</a> · <a href="/admin/quotations?f=Draft">draft</a> · <a href="/admin/quotations?f=Sent">sent</a> · <a href="/admin/quotations?f=Approved">approved</a> · <a href="/admin/quotations?f=Converted">converted</a></p>' .
         ($tr ? table(['Brand', 'Quotation', 'Customer', 'Total', 'Deposit', 'Status'], $tr) : '<p class="mut">No quotations. Create one from an event.</p>'));
 }
@@ -1116,7 +1116,7 @@ function pg_admin_warehouse(): void
     foreach ($moves as $m) {
         $mr[] = [e($m['created_at']), e($m['sku']), e($m['qty_change']), e($m['fw']), e($m['ref_type']) . ' ' . e((string) ($m['notes'] ?? ''))];
     }
-    layout('Warehouse', admin_nav() . '<h1>Warehouse</h1>
+    layout('Warehouse', admin_nav() . section_tabs([['/admin/warehouse', 'Warehouse'], ['/admin/transfers', 'Transfers'], ['/admin/purchases', 'Purchasing']]) . '<h1>Warehouse</h1>
       <div class="card"><form method="get" action="/admin/warehouse"><label class="fld"><span>Warehouse</span>
       <select name="w" onchange="this.form.submit()">' . $whopts . '</select></label></form>
       ' . ($tr ? table(['SKU', 'Item', 'Here', 'Global'], $tr) : '<p class="mut">Nothing stocked here.</p>') . '</div>

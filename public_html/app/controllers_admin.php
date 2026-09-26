@@ -10,21 +10,18 @@ function staff_sidebar(): string
         'Desk' => [
             ['url' => '/admin', 'label' => 'Dashboards', 'icon' => 'dashboard'],
             ['url' => '/admin/enquiries', 'label' => 'Enquiries', 'icon' => 'enquiries'],
-            ['label' => 'POS', 'icon' => 'pos', 'default' => '/admin/pos', 'children' => [
-                ['/admin/pos', 'Creations'], ['/admin/bakery-pos', 'Bakery']]],
+            ['url' => '/admin/pos', 'label' => 'POS', 'icon' => 'pos'],
             ['url' => '/admin/events', 'label' => 'Events', 'icon' => 'events'],
             ['url' => '/admin/catering', 'label' => 'Catering', 'icon' => 'catering'],
             ['url' => '/admin/rentals', 'label' => 'Rentals', 'icon' => 'rentals'],
         ],
         'Money' => [
             ['url' => '/admin/payments', 'label' => 'Payments', 'icon' => 'payments'],
-            ['label' => 'Orders', 'icon' => 'orders', 'default' => '/admin/orders', 'children' => [
-                ['/admin/orders', 'Orders'], ['/admin/quotations', 'Quotations'], ['/admin/invoices', 'Invoices']]],
+            ['url' => '/admin/orders', 'label' => 'Orders', 'icon' => 'orders'],
         ],
         'Stock' => [
             ['url' => '/admin/items', 'label' => 'Items', 'icon' => 'items'],
-            ['label' => 'Warehouse', 'icon' => 'warehouse', 'default' => '/admin/warehouse', 'children' => [
-                ['/admin/transfers', 'Transfers'], ['/admin/purchases', 'Purchasing']]],
+            ['url' => '/admin/warehouse', 'label' => 'Warehouse', 'icon' => 'warehouse'],
         ],
         'Setup' => [
             ['url' => '/admin/reports', 'label' => 'Reports', 'icon' => 'reports'],
@@ -36,31 +33,19 @@ function staff_sidebar(): string
     $hot = ['/admin/enquiries' => $open, '/admin/payments' => $pend];
     $here = parse_url($_SERVER['REQUEST_URI'] ?? '/admin', PHP_URL_PATH) ?: '/admin';
     $h = '';
+    // Child pages light up their section parent (Creations = default POS till).
+    $aliases = ['/admin/bakery-pos' => '/admin/pos', '/admin/quotations' => '/admin/orders',
+                '/admin/invoices' => '/admin/orders', '/admin/transfers' => '/admin/warehouse',
+                '/admin/purchases' => '/admin/warehouse'];
+    $here = $aliases[$here] ?? $here;
     foreach ($groups as $g => $links) {
         $h .= '<div class="side-grp"><span>' . $g . '</span>';
         foreach ($links as $link) {
-            if (isset($link['children'])) {
-                $kidUrls = array_column($link['children'], 0);
-                $isOpen = in_array($here, $kidUrls, true) || $here === $link['default']
-                    || str_starts_with($here, $link['default'] . '/');
-                $h .= '<div class="side-sub' . ($isOpen ? ' open' : '') . '" data-sub="' . e($link['label']) . '">'
-                    . '<div class="side-parent"><a href="' . $link['default'] . '" class="side-link' . ($isOpen ? ' on' : '') . '">'
-                    . '<span class="ico">' . icon($link['icon']) . '</span><span class="lbl">' . $link['label'] . '</span></a>'
-                    . '<button class="caret" data-caret aria-label="Expand">▸</button></div>'
-                    . '<div class="side-kids">';
-                foreach ($link['children'] as $kid) {
-                    [$url, $label] = $kid;
-                    $on = ($here === $url || str_starts_with($here, $url . '/')) ? ' on' : '';
-                    $h .= '<a href="' . $url . '" class="side-link sub' . $on . '"><span class="lbl">' . $label . '</span></a>';
-                }
-                $h .= '</div></div>';
-            } else {
-                [$url, $label, $ic] = [$link['url'], $link['label'], $link['icon']];
-                $n = $hot[$url] ?? 0;
-                $active = ($here === $url || ($url !== '/admin' && str_starts_with($here, $url . '/'))) ? ' on' : '';
-                $h .= '<a href="' . $url . '" class="side-link' . ($n ? ' hot' : '') . $active . '">'
-                    . '<span class="ico">' . icon($ic) . '</span><span class="lbl">' . $label . ($n ? ' <b>(' . $n . ')</b>' : '') . '</span></a>';
-            }
+            [$url, $label, $ic] = [$link['url'], $link['label'], $link['icon']];
+            $n = $hot[$url] ?? 0;
+            $active = ($here === $url || ($url !== '/admin' && str_starts_with($here, $url . '/'))) ? ' on' : '';
+            $h .= '<a href="' . $url . '" class="side-link' . ($n ? ' hot' : '') . $active . '">'
+                . '<span class="ico">' . icon($ic) . '</span><span class="lbl">' . $label . ($n ? ' <b>(' . $n . ')</b>' : '') . '</span></a>';
         }
         $h .= '</div>';
     }
@@ -69,22 +54,31 @@ function staff_sidebar(): string
     $words = array_slice(explode(' ', $name), 0, 2);
     $initials = strtoupper(implode('', array_map(fn($w) => mb_substr($w, 0, 1), $words)));
     $h .= '<div class="side-foot">'
-        . '<div class="side-user"><span class="avatar-lg sm">' . e($initials) . '</span>'
-        . '<span class="who"><strong>' . e($name) . ' <a href="/logout" title="Logout">' . icon('logout') . '</a></strong><small>' . e($role) . '</small></span></div>'
-        . '<div class="side-row"><button id="side-collapse" class="theme-btn" title="Collapse sidebar">⇤</button></div>'
-        . '</div>';
+        . '<div class="profile"><span class="avatar-lg sm">' . e($initials) . '</span>'
+        . '<span class="who"><strong>' . e($name) . '</strong><small>' . e($role) . '</small></span>'
+        . '<span class="dot-online" title="Signed in"></span></div>'
+        . '<div class="profile-actions">'
+        . '<a class="profile-btn" href="/logout">' . icon('logout') . '<span>Logout</span></a>'
+        . '<button id="side-collapse" class="profile-btn" title="Collapse sidebar">⇤<span>Fold</span></button>'
+        . '</div></div>';
     $h .= '<script>(function(){try{'
         . 'if(localStorage.getItem("glam-side")==="mini"){document.body.classList.add("side-mini");}'
         . 'document.getElementById("side-collapse").onclick=function(){document.body.classList.toggle("side-mini");localStorage.setItem("glam-side",document.body.classList.contains("side-mini")?"mini":"full");};'
         . 'var b=document.getElementById("side-burger");if(b){b.onclick=function(){document.body.classList.toggle("side-open");};}'
         . 'var sc=document.getElementById("side-close");if(sc){sc.onclick=function(){document.body.classList.remove("side-open");};}'
-        . 'document.querySelectorAll("[data-caret]").forEach(function(b){b.onclick=function(){var d=b.closest(".side-sub");d.classList.toggle("open");'
-        . 'try{var o=JSON.parse(localStorage.getItem("glam-sub")||"[]");var k=d.dataset.sub;'
-        . 'if(d.classList.contains("open")){if(o.indexOf(k)<0)o.push(k);}else{o=o.filter(function(x){return x!==k;});}'
-        . 'localStorage.setItem("glam-sub",JSON.stringify(o));}catch(e){}};});'
-        . 'try{var oo=JSON.parse(localStorage.getItem("glam-sub")||"[]");oo.forEach(function(k){var dd=document.querySelector(\'[data-sub="\' + k + \'"]\');if(dd)dd.classList.add("open");});}catch(e){}'
         . '}catch(e){}})();</script>';
     return $h;
+}
+
+/** Sibling tabs shown on top of grouped work pages (POS / Orders / Warehouse). */
+function section_tabs(array $tabs): string
+{
+    $here = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+    $h = '<div class="tabs section-tabs">';
+    foreach ($tabs as [$url, $label]) {
+        $h .= '<a href="' . $url . '" class="' . ($here === $url ? 'on' : '') . '">' . $label . '</a>';
+    }
+    return $h . '</div>';
 }
 
 function admin_nav(): string
@@ -920,7 +914,7 @@ function pg_admin_orders(): void
         $tr[] = [brand_badge($r['company']), '#' . $r['id'], e($r['customer']), money((float) $r['grand_total']),
                  e($r['fulfilment_method']) . ' / ' . e($r['delivery_status']) . $next, e($r['status'])];
     }
-    layout('Orders', admin_nav() . '<h1>Sales orders</h1>' .
+    layout('Orders', admin_nav() . section_tabs([['/admin/orders', 'Orders'], ['/admin/quotations', 'Quotations'], ['/admin/invoices', 'Invoices']]) . '<h1>Sales orders</h1>' .
         ($tr ? table(['Brand', '#', 'Customer', 'Total', 'Delivery', 'Status'], $tr) : '<p class="mut">No orders.</p>'));
 }
 

@@ -84,6 +84,7 @@ $wa = preg_replace('/\D+/', '', setting_get('whatsapp', ''));
 if ($wa !== ''): ?>
 <a class="wa-float" href="https://wa.me/<?= e($wa) ?>?text=Hello%20Glamorous!" target="_blank" rel="noopener">Chat to order</a>
 <?php endif; ?>
+<?php if (!$staffChrome): ?>
 <footer class="foot">
   <div class="foot-inner">
     <div>
@@ -107,6 +108,7 @@ if ($wa !== ''): ?>
   </div>
   <p class="base">www.glamorous.mw · Glamorous Creations &amp; Glamorous Delights · Cash, bank transfer &amp; mobile money accepted</p>
 </footer>
+<?php endif; ?>
 </body>
 </html>
 <?php
