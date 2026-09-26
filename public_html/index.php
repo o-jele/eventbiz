@@ -49,6 +49,7 @@ $routes = [
     '/admin/catering' => 'pg_admin_catering',
     '/admin/pos' => 'pg_admin_pos',
     '/admin/purchases' => 'pg_admin_purchases',
+    '/admin/transfers' => 'pg_admin_transfers',
     '/password' => 'pg_password',
     '/admin/enquiries' => 'pg_admin_enquiries',
     '/admin/events' => 'pg_admin_events',

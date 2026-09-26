@@ -501,3 +501,89 @@ function pg_password(): void
       ' . field('New password (8+ chars)', '<input type="password" name="newpass" required>') . '
       <button class="btn">Change</button></form></div>');
 }
+
+// ---------- Intercompany transfers (SPEC §6) ----------
+// Explicit, auditable GC↔GD moves. Silent cross-company Stock Entries stay
+// blocked in post_stock(); this is the ONLY legal cross-company path.
+function pg_admin_transfers(): void
+{
+    $u = require_role(['admin', 'accounts']);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        check_csrf();
+        $from = db_one('SELECT w.*, c.name AS company FROM warehouses w JOIN companies c ON c.id=w.company_id WHERE w.id = ? AND w.is_group = 0', [(int) post('from_warehouse')]);
+        $to = db_one('SELECT w.*, c.name AS company FROM warehouses w JOIN companies c ON c.id=w.company_id WHERE w.id = ? AND w.is_group = 0', [(int) post('to_warehouse')]);
+        $it = db_one('SELECT * FROM items WHERE id = ?', [(int) post('item_id')]);
+        $qty = (float) post('qty', '0');
+        $price = (float) post('unit_price', '0');
+        if (!$from || !$to || !$it) {
+            exit('Pick source, destination and item.');
+        }
+        if ((int) $from['company_id'] === (int) $to['company_id']) {
+            flash('Same-company move — use Items → Adjust instead. Transfers are GC↔GD only.', 'err');
+            redirect('/admin/transfers');
+        }
+        if ($qty <= 0) {
+            flash('Quantity must be above zero.', 'err');
+            redirect('/admin/transfers');
+        }
+        $have = warehouse_balance((int) $it['id'], (int) $from['id']);
+        if ($have < $qty) {
+            flash('Only ' . $have . ' × ' . $it['name'] . ' in ' . $from['name'] . ' (ledger balance).', 'err');
+            redirect('/admin/transfers');
+        }
+        db()->beginTransaction();
+        db_exec(
+            'INSERT INTO transfers (from_warehouse_id, to_warehouse_id, item_id, qty, unit_price, amount, reference, notes, created_by)
+             VALUES (?,?,?,?,?,?,?,?,?)',
+            [(int) $from['id'], (int) $to['id'], (int) $it['id'], $qty, $price, $qty * $price,
+             post('reference') ?: null, post('notes') ?: null, (int) $u['id']]
+        );
+        $tid = db_last_id();
+        // Paired ledger moves. items.stock_qty is intentionally untouched:
+        // global on-hand is unchanged, only the owning company differs.
+        db_exec(
+            'INSERT INTO stock_moves (item_id, warehouse_id, qty_change, ref_type, ref_id, notes, created_by)
+             VALUES (?,?,?,?,?,?,?)',
+            [(int) $it['id'], (int) $from['id'], -$qty, 'transfer', $tid, 'Intercompany out', (int) $u['id']]
+        );
+        db_exec(
+            'INSERT INTO stock_moves (item_id, warehouse_id, qty_change, ref_type, ref_id, notes, created_by)
+             VALUES (?,?,?,?,?,?,?)',
+            [(int) $it['id'], (int) $to['id'], $qty, 'transfer', $tid, 'Intercompany in', (int) $u['id']]
+        );
+        db()->commit();
+        flash('Transfer #' . $tid . ' recorded: ' . $qty . ' × ' . $it['name'] . ' (' . $from['company'] . ' → ' . $to['company'] . ').');
+        redirect('/admin/transfers');
+    }
+    $whs = db_all('SELECT w.id, w.name, c.name AS company FROM warehouses w JOIN companies c ON c.id=w.company_id WHERE w.is_group = 0 ORDER BY w.name');
+    $opts = '';
+    foreach ($whs as $w) {
+        $opts .= '<option value="' . (int) $w['id'] . '">' . e($w['name']) . ' (' . e($w['company']) . ')</option>';
+    }
+    $items = db_all("SELECT id, name FROM items WHERE item_type IN ('stock','rental') ORDER BY name");
+    $iopts = '';
+    foreach ($items as $i) {
+        $iopts .= '<option value="' . (int) $i['id'] . '">' . e($i['name']) . '</option>';
+    }
+    $rows = db_all(
+        'SELECT t.*, f.name AS fw, c1.name AS fc, w.name AS tw, c2.name AS tc, i.name AS item
+         FROM transfers t JOIN warehouses f ON f.id=t.from_warehouse_id JOIN companies c1 ON c1.id=f.company_id
+         JOIN warehouses w ON w.id=t.to_warehouse_id JOIN companies c2 ON c2.id=w.company_id
+         JOIN items i ON i.id=t.item_id ORDER BY t.id DESC LIMIT 50'
+    );
+    $tr = [];
+    foreach ($rows as $r) {
+        $tr[] = ['#' . $r['id'], e($r['item']) . ' × ' . e((string) $r['qty']),
+                 brand_badge($r['fc']) . ' ' . e($r['fw']) . ' → ' . brand_badge($r['tc']) . ' ' . e($r['tw']),
+                 money((float) $r['amount']), e((string) ($r['reference'] ?? ''))];
+    }
+    layout('Transfers', admin_nav() . '<h1>Intercompany transfers</h1>
+      <p class="mut">Explicit GC↔GD moves with a paper trail. Same-company moves belong in Items → Adjust.</p>
+      <div class="card"><form method="post">' . csrf_field() . '
+      <div class="row2">' . field('From warehouse', '<select name="from_warehouse">' . $opts . '</select>') . field('To warehouse', '<select name="to_warehouse">' . $opts . '</select>') . '</div>
+      <div class="row2">' . field('Item', '<select name="item_id">' . $iopts . '</select>') . field('Qty', '<input name="qty" required>') . '</div>
+      <div class="row2">' . field('Transfer price (per unit)', '<input name="unit_price" value="0">') . field('Reference', '<input name="reference">') . '</div>
+      ' . field('Notes', '<input name="notes">') . '
+      <button class="btn">Record transfer</button></form></div>
+      <h2>History</h2>' . ($tr ? table(['#', 'Item', 'From → To', 'Amount', 'Ref'], $tr) : '<p class="mut">No transfers yet.</p>'));
+}

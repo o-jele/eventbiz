@@ -52,6 +52,16 @@ function rental_available(int $itemId, string $from, string $to, ?int $excludeBo
     return max(0, (float) $item['stock_qty'] - (float) ($row['reserved'] ?? 0));
 }
 
+/** Per-warehouse balance from the ledger (items.stock_qty is the global cache). */
+function warehouse_balance(int $itemId, int $warehouseId): float
+{
+    $row = db_one(
+        'SELECT COALESCE(SUM(qty_change),0) AS b FROM stock_moves WHERE item_id = ? AND warehouse_id = ?',
+        [$itemId, $warehouseId]
+    );
+    return (float) ($row['b'] ?? 0);
+}
+
 /** Pure deposit settlement (SPEC T4). Never posts payments — caller does. */
 function settle_deposit(float $received, float $damage = 0, float $missing = 0, float $cleaning = 0, float $forfeited = 0): array
 {

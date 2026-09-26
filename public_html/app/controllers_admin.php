@@ -10,6 +10,7 @@ function admin_nav(): string
       <a href="/admin/catering">Catering</a> · <a href="/admin/rentals">Rentals</a> ·
       <a href="/admin/payments">Payments</a> · <a href="/admin/orders">Orders</a> ·
       <a href="/admin/pos">Counter sale</a> · <a href="/admin/purchases">Purchasing</a> ·
+      <a href="/admin/transfers">Transfers</a> ·
       <a href="/admin/items">Items</a> · <a href="/admin/users">Users</a> ·
       <a href="/admin/reports">Reports</a></p>';
 }
@@ -704,8 +705,24 @@ function pg_admin_reports(): void
     foreach ($bal as $x) {
         $br[] = [e($x['customer']), brand_badge($x['company']), money((float) $x['bal'])];
     }
+    $decl = db_all(
+        'SELECT status, COUNT(*) n, COALESCE(SUM(amount),0) t FROM payment_declarations GROUP BY status'
+    );
+    $dr = [];
+    foreach ($decl as $d) {
+        $dr[] = [e($d['status']), (int) $d['n'], money((float) $d['t'])];
+    }
+    $pm = db_all(
+        'SELECT kind, method, COUNT(*) n, COALESCE(SUM(amount),0) t FROM payments GROUP BY kind, method ORDER BY kind, method'
+    );
+    $pr = [];
+    foreach ($pm as $p) {
+        $pr[] = [e($p['kind']), e($p['method']), (int) $p['n'], money((float) $p['t'])];
+    }
     layout('Reports', admin_nav() . '<h1>Reports</h1>
       <h2>Sales by company</h2>' . ($sr ? table(['Company', 'Orders', 'Total MWK'], $sr) : '<p class="mut">No sales.</p>') . '
       <h2>Rental utilization</h2>' . ($ur ? table(['Equipment', 'Owned', 'Active bookings', 'Units out'], $ur) : '<p class="mut">No rental items.</p>') . '
-      <h2>Customer balances &gt; 0</h2>' . ($br ? table(['Customer', 'Company', 'Balance'], $br) : '<p class="mut">All settled.</p>'));
+      <h2>Customer balances &gt; 0</h2>' . ($br ? table(['Customer', 'Company', 'Balance'], $br) : '<p class="mut">All settled.</p>') . '
+      <h2>Payment declarations by status</h2>' . ($dr ? table(['Status', 'Count', 'Total MWK'], $dr) : '<p class="mut">None.</p>') . '
+      <h2>Posted payments</h2>' . ($pr ? table(['Kind', 'Method', 'Count', 'Total MWK'], $pr) : '<p class="mut">None.</p>'));
 }
