@@ -32,7 +32,7 @@ function staff_sidebar(): string
     $pend = (int) (db_one("SELECT COUNT(*) AS c FROM payment_declarations WHERE status IN ('Submitted','Pending Verification')")['c'] ?? 0);
     $hot = ['/admin/enquiries' => $open, '/admin/payments' => $pend];
     $here = parse_url($_SERVER['REQUEST_URI'] ?? '/admin', PHP_URL_PATH) ?: '/admin';
-    $h = '';
+    $h = '<a class="side-brand" href="/admin"><span class="full">Glamorous<em>.</em></span><span class="mini-mark">G.</span></a>';
     // Child pages light up their section parent (Creations = default POS till).
     $aliases = ['/admin/bakery-pos' => '/admin/pos', '/admin/quotations' => '/admin/orders',
                 '/admin/invoices' => '/admin/orders', '/admin/transfers' => '/admin/warehouse',

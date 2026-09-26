@@ -36,7 +36,6 @@ function layout(string $title, string $body, string $active = ''): void
 <body<?= $staffChrome ? ' class="has-side"' : '' ?>>
 <header class="topbar">
   <?php if ($staffChrome): ?><button id="side-burger" aria-label="Open menu">&#9776;</button><?php endif; ?>
-  <?= $brandHtml ?>
   <?php if ($staffChrome): ?>
   <nav class="staff-top">
     <button id="theme-toggle" class="theme-btn icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">
@@ -45,6 +44,7 @@ function layout(string $title, string $body, string $active = ''): void
     <a class="btn sec" href="/"><?= icon('home') ?> View site</a>
   </nav>
   <?php else: ?>
+  <?= $brandHtml ?>
   <nav>
     <a href="/creations/shop">Shop</a>
     <a href="/delights/cakes">Cakes</a>
