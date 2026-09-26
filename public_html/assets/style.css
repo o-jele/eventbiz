@@ -304,7 +304,9 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .trend.flat { background: #EFE9EF; color: var(--mut); }
 .spark { display: block; margin-top: .4rem; }
 .stat .row { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
-.quick-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin: 0 0 1.2rem; }
+.quick-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin: 0 0 1.2rem; }
+.quick-actions .btn { text-align: center; }
+@media (max-width: 700px) { .quick-actions { grid-template-columns: repeat(2, 1fr); } }
 .chart-card { padding: 1.2rem 1.3rem; }
 .chart-meta { display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: baseline; margin-bottom: .6rem; }
 .chart-meta .big { font-size: 1.7rem; font-weight: 700; color: var(--wine); }

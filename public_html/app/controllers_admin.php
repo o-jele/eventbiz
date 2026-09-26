@@ -126,14 +126,6 @@ function pg_admin(): void
     for ($i = 6; $i >= 0; $i--) {
         $range[] = date('Y-m-d', strtotime("-$i days"));
     }
-    $series = function (array $map) use ($range): array {
-        $out = [];
-        foreach ($range as $d) {
-            $out[] = (float) ($map[$d]['t'] ?? 0);
-        }
-        return $out;
-    };
-    $salesMap = $byDay('sales_orders', 'grand_total', 'created_at', 'company_id');
     $enqMap = $byDay('enquiries', '1', 'created_at', 'company_id');
     $payMap = $byDay('payments', 'amount', 'created_at', 'company_id');
     $prevQ = function (string $table, string $sumCol, string $dateCol, ?string $companyCol) use ($scope) {
@@ -148,12 +140,14 @@ function pg_admin(): void
     $sPrev = $prevQ('sales_orders', 'grand_total', 'created_at', 'company_id');
     $ePrev = $prevQ('enquiries', '1', 'created_at', 'company_id');
     $pPrev = $prevQ('payments', 'amount', 'created_at', 'company_id');
-    $sales7 = array_sum($series($salesMap));
     $enq7 = 0;
     foreach ($range as $d) {
         $enq7 += (int) ($enqMap[$d]['n'] ?? 0);
     }
-    $pay7 = array_sum($series($payMap));
+    $pay7 = 0;
+    foreach ($range as $d) {
+        $pay7 += (float) ($payMap[$d]['t'] ?? 0);
+    }
 
     // Revenue 30d + prior 30d.
     $days = [];
@@ -280,9 +274,9 @@ function pg_admin(): void
         return '<div class="stat' . ($alert ? ' alert' : '') . '"><div class="n">' . $num . '</div>'
             . '<div class="l">' . e($label) . '</div><p><a href="' . $link . '">Open →</a></p></div>';
     };
-    $tile = function (string $num, string $label, string $link, string $spark, string $badgeHtml, bool $alert = false, float $raw = 0, int $dec = 0, string $pre = ''): string {
-        return '<a class="stat' . ($alert ? ' alert' : '') . '" href="' . $link . '"><div class="row"><div><div class="n" data-count="' . $raw . '" data-dec="' . $dec . '" data-pre="' . $pre . '">' . $num . '</div>'
-            . '<div class="l">' . e($label) . ' ' . $badgeHtml . '</div></div><div>' . $spark . '</div></div></a>';
+    $tile = function (string $num, string $label, string $link, string $badgeHtml, bool $alert = false, float $raw = 0, int $dec = 0, string $pre = ''): string {
+        return '<a class="stat' . ($alert ? ' alert' : '') . '" href="' . $link . '"><div class="n" data-count="' . $raw . '" data-dec="' . $dec . '" data-pre="' . $pre . '">' . $num . '</div>'
+            . '<div class="l">' . e($label) . ' ' . $badgeHtml . '</div></a>';
     };
     $opsOnly = $u['role'] !== 'creations_staff';
 
@@ -353,13 +347,13 @@ function pg_admin(): void
         . '<a class="btn sec" href="/admin/rentals">Rentals</a></div>'
         . '<div class="stats">'
         . $tile((string) $open, 'open enquiries', '/admin/enquiries',
-            svg_sparkline($series($enqMap)), trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0, (float) $open, 0, '')
+            trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0, (float) $open, 0, '')
         . $tile(number_format((float) ($pend['t'] ?? 0)), 'to verify (' . (int) ($pend['n'] ?? 0) . ')', '/admin/payments',
-            svg_sparkline($series($payMap)), trend_badge(trend_of((float) $pay7, (float) ($pPrev['t'] ?? 0))), ($pend['n'] ?? 0) > 0, (float) ($pend['t'] ?? 0), 0, 'MK')
+            trend_badge(trend_of((float) $pay7, (float) ($pPrev['t'] ?? 0))), ($pend['n'] ?? 0) > 0, (float) ($pend['t'] ?? 0), 0, 'MK')
         . $tile(number_format($revTotal), 'revenue 30d', '/admin/reports',
-            svg_sparkline(array_column(array_values($days), 'value')), trend_badge(trend_of($revTotal, $revPrev)), false, $revTotal, 0, 'MK')
+            trend_badge(trend_of($revTotal, $revPrev)), false, $revTotal, 0, 'MK')
         . $tile(number_format((float) ($unpaid['t'] ?? 0)), 'owed (' . (int) ($unpaid['n'] ?? 0) . ' invoices)', '/admin/invoices?f=unpaid',
-            '', '', ($unpaid['n'] ?? 0) > 0, (float) ($unpaid['t'] ?? 0), 0, 'MK')
+            '', ($unpaid['n'] ?? 0) > 0, (float) ($unpaid['t'] ?? 0), 0, 'MK')
         . '</div>'
         . '<div class="panel chart-card"><h3>Revenue · last 30 days</h3><div class="chart-meta"><span class="big" data-count="' . $revTotal . '" data-dec="0" data-pre="MK">MK' . number_format($revTotal) . '</span>'
         . trend_badge(trend_of($revTotal, $revPrev)) . '<span class="mut">vs prior 30d</span></div>'
