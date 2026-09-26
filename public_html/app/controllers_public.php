@@ -4,8 +4,20 @@ declare(strict_types=1);
 
 function pg_home(): void
 {
+    $feat = db_one(
+        "SELECT * FROM items WHERE published = 1 AND image_path IS NOT NULL AND image_path != ''
+         ORDER BY featured DESC, id LIMIT 1"
+    );
+    $featHtml = '';
+    if ($feat) {
+        $featHtml = '<a class="hero-feature" href="/product/' . (int) $feat['id'] . '">'
+            . item_img($feat['image_path'], $feat['name'])
+            . '<span class="hero-feature-tag">Featured</span>'
+            . '<strong>' . e($feat['name']) . '</strong>'
+            . '<span class="price">MWK ' . money((float) $feat['price']) . '</span></a>';
+    }
     layout('Welcome', '
-    <section class="hero-band">
+    <section class="hero-band"><div class="hero-grid"><div>
       <span class="hero-kicker">Lilongwe · Malawi</span>
       <h1>Bakes, cakes &amp; celebrations, beautifully done.</h1>
       <p class="lead">Stock your kitchen at <strong>Glamorous Creations</strong> — or let <strong>Glamorous Delights</strong> handle your wedding, party or corporate event, from cake to catering to chairs.</p>
@@ -13,7 +25,7 @@ function pg_home(): void
         <a class="btn" href="/creations/shop">Shop supplies</a>
         <a class="btn gold" href="/delights/request">Plan an event</a>
       </div>
-    </section>
+    </div>' . $featHtml . '</div></section>
     <div class="hero">
       <a class="cat-card" href="/creations/shop"><h3>Glamorous Creations</h3>
         <p>Flour, flavours, tools &amp; packaging for home bakers and businesses. Order online — pickup or arranged delivery.</p>
