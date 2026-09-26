@@ -10,7 +10,7 @@ function admin_nav(): string
       <a href="/admin/catering">Catering</a> · <a href="/admin/rentals">Rentals</a> ·
       <a href="/admin/payments">Payments</a> · <a href="/admin/orders">Orders</a> ·
       <a href="/admin/pos">Counter sale</a> · <a href="/admin/purchases">Purchasing</a> ·
-      <a href="/admin/transfers">Transfers</a> ·
+      <a href="/admin/transfers">Transfers</a> · <a href="/admin/invoices">Invoices</a> ·
       <a href="/admin/items">Items</a> · <a href="/admin/users">Users</a> ·
       <a href="/admin/reports">Reports</a></p>';
 }
@@ -605,13 +605,14 @@ function pg_admin_items(): void
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['new'] ?? '') === '1') {
         check_csrf();
+        $img = save_upload('image', 'products');
         db_exec(
-            'INSERT INTO items (sku, name, item_group_id, company_id, uom, item_type, business_unit, cost, price, replacement_rate, stock_qty, default_warehouse_id, published, description)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO items (sku, name, item_group_id, company_id, uom, item_type, business_unit, cost, price, replacement_rate, stock_qty, default_warehouse_id, published, image_path, description)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
             [post('sku'), post('name'), (int) post('item_group_id') ?: null, (int) post('company_id') ?: null,
              post('uom', 'Pc'), post('item_type', 'stock'), post('business_unit', 'Shared'),
              (float) post('cost'), (float) post('price'), (float) post('replacement_rate'),
-             (float) post('stock_qty'), (int) post('warehouse_id') ?: null, post('published') ? 1 : 0, post('description')]
+             (float) post('stock_qty'), (int) post('warehouse_id') ?: null, post('published') ? 1 : 0, $img, post('description')]
         );
         flash('Item created.');
         redirect('/admin/items');
@@ -628,7 +629,8 @@ function pg_admin_items(): void
         $whOpts .= '<option value="' . (int) $w['id'] . '">' . e($w['name']) . '</option>';
     }
     foreach ($rows as $r) {
-        $tr[] = [e($r['sku']), e($r['name']) . '<br><span class="mut">' . e((string) ($r['grp'] ?? '')) . ' · ' . e($r['item_type']) . '</span>',
+        $thumb = !empty($r['image_path']) ? item_img($r['image_path'], $r['name']) : '';
+        $tr[] = [e($r['sku']), $thumb . e($r['name']) . '<br><span class="mut">' . e((string) ($r['grp'] ?? '')) . ' · ' . e($r['item_type']) . '</span>',
                  e((string) $r['stock_qty']), money((float) $r['price']),
                  '<form method="post" action="/admin/items?adjust=' . (int) $r['id'] . '">' . csrf_field() . '
                    <input name="qty" placeholder="+/- qty" size="8">
@@ -647,7 +649,7 @@ function pg_admin_items(): void
     }
     layout('Items', admin_nav() . '<h1>Items &amp; stock</h1>' .
         table(['SKU', 'Item', 'Stock', 'Price', 'Adjust'], $tr) . '
-        <h2>New item</h2><div class="card"><form method="post" action="/admin/items?new=1">' . csrf_field() . '
+        <h2>New item</h2><div class="card"><form method="post" action="/admin/items?new=1" enctype="multipart/form-data">' . csrf_field() . '
         ' . field('SKU', '<input name="sku" required>') . field('Name', '<input name="name" required>') . '
         ' . field('Group', '<select name="item_group_id">' . $gopts . '</select>') . '
         ' . field('Company', '<select name="company_id">' . $copts . '</select>') . '
@@ -656,6 +658,7 @@ function pg_admin_items(): void
         <div class="row2">' . field('Cost', '<input name="cost" value="0">') . field('Price', '<input name="price" value="0">') . '</div>
         ' . field('Opening stock', '<input name="stock_qty" value="0">') . '
         ' . field('Warehouse', '<select name="warehouse_id">' . $whOpts . '</select>') . '
+        ' . field('Photo (website)', '<input type="file" name="image" accept="image/*">') . '
         ' . field('Published on website', '<select name="published"><option value="0">No</option><option value="1">Yes</option></select>') . '
         <button class="btn">Create item</button></form></div>');
 }

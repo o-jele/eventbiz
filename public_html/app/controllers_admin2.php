@@ -113,7 +113,7 @@ function pg_admin_bakery(): void
               <input type="hidden" name="complete_cake" value="' . (int) $r['id'] . '">
               <button class="btn sec">Complete</button></form>';
         }
-        $tr[] = [brand_badge($r['company']), '#' . $r['id'] . ' ' . e($r['product']),
+        $tr[] = [brand_badge($r['company']), '#' . $r['id'] . ' ' . e($r['order_type']) . ': ' . e($r['product']),
                  e($r['customer']), e($r['required_date']),
                  money((float) $r['price']) . '<br><span class="mut">' . e($r['status']) . ' / ' . e($r['production_status']) . '</span>', $acts];
     }
@@ -598,4 +598,41 @@ function pg_admin_transfers(): void
       ' . field('Notes', '<input name="notes">') . '
       <button class="btn">Record transfer</button></form></div>
       <h2>History</h2>' . ($tr ? table(['#', 'Item', 'From → To', 'Amount', 'Ref'], $tr) : '<p class="mut">No transfers yet.</p>'));
+}
+
+// ---------- Invoice list (who owes what) ----------
+function pg_admin_invoices(): void
+{
+    $u = require_staff();
+    $conds = [];
+    $params = [];
+    // Single-company roles see only their company's invoices.
+    if (($u['role'] === 'creations_staff')) {
+        $conds[] = 'c.abbr = ?';
+        $params[] = 'GC';
+    } elseif (in_array($u['role'], ['delights_sales', 'delights_ops'], true)) {
+        $conds[] = 'c.abbr = ?';
+        $params[] = 'GD';
+    }
+    $f = get_param('f');
+    if ($f === 'unpaid') {
+        $conds[] = '(i.total - i.paid) > 0';
+    }
+    $where = $conds ? 'WHERE ' . implode(' AND ', $conds) : '';
+    $rows = db_all(
+        "SELECT i.*, c.name AS company, k.name AS customer FROM invoices i
+         JOIN companies c ON c.id=i.company_id JOIN customers k ON k.id=i.customer_id
+         $where ORDER BY i.id DESC LIMIT 100", $params
+    );
+    $tr = [];
+    foreach ($rows as $r) {
+        $bal = (float) $r['total'] - (float) $r['paid'];
+        $tr[] = [brand_badge($r['company']),
+                 '<a href="/invoice/' . (int) $r['id'] . '" target="_blank">#' . (int) $r['id'] . '</a> ' . e($r['label']),
+                 e($r['customer']), money((float) $r['total']), money((float) $r['paid']),
+                 money($bal), e($r['status'])];
+    }
+    layout('Invoices', admin_nav() . '<h1>Invoices</h1>
+      <p class="mut">Filter: <a href="/admin/invoices">all</a> · <a href="/admin/invoices?f=unpaid">unpaid only</a></p>' .
+        ($tr ? table(['Brand', 'Invoice', 'Customer', 'Total', 'Paid', 'Balance', 'Status'], $tr) : '<p class="mut">No invoices.</p>'));
 }

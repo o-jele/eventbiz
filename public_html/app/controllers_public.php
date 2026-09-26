@@ -23,7 +23,7 @@ function pg_creations(): void
     );
     $cards = '';
     foreach ($items as $it) {
-        $cards .= '<div class="card"><h3>' . e($it['name']) . '</h3>
+        $cards .= '<div class="card">' . item_img($it['image_path'] ?? null, $it['name']) . '<h3>' . e($it['name']) . '</h3>
           <p class="mut">' . e($it['sku']) . ' · Stock: ' . e((string) $it['stock_qty']) . '</p>
           <p><strong>MWK ' . money((float) $it['price']) . '</strong></p>
           <p><a class="btn" href="/product/' . (int) $it['id'] . '">View</a></p></div>';
@@ -39,7 +39,7 @@ function pg_product(int $id): void
         exit('Product not found.');
     }
     layout($it['name'], '
-    <div class="card"><h1>' . e($it['name']) . '</h1>
+    <div class="card">' . item_img($it['image_path'] ?? null, $it['name']) . '<h1>' . e($it['name']) . '</h1>
     <p class="mut">' . e($it['sku']) . ' · ' . e($it['uom']) . ' · Stock: ' . e((string) $it['stock_qty']) . '</p>
     <p>' . nl2br(e($it['description'] ?? '')) . '</p>
     <p><strong>MWK ' . money((float) $it['price']) . '</strong></p>
@@ -79,13 +79,32 @@ function pg_cart(): void
         }
         $amt = $qty * (float) $it['price'];
         $total += $amt;
-        $rows[] = [e($it['name']), (int) $qty, money((float) $it['price']), money($amt)];
+        $rows[] = [e($it['name']), (int) $qty, money((float) $it['price']), money($amt),
+                   '<form method="post" action="/cart/remove" style="display:inline">' . csrf_field() . '
+                    <input type="hidden" name="item_id" value="' . (int) $id . '">
+                    <button class="btn sec">Remove</button></form>'];
     }
-    $body = '<h1>Cart</h1>' . ($rows ? table(['Item', 'Qty', 'Rate', 'Amount'], $rows)
+    $body = '<h1>Cart</h1>' . ($rows ? table(['Item', 'Qty', 'Rate', 'Amount', ''], $rows)
         . '<p><strong>Total: MWK ' . money($total) . '</strong></p>
-           <p><a class="btn" href="/checkout">Checkout</a></p>'
+           <p><a class="btn" href="/checkout">Checkout</a>
+           <form method="post" action="/cart/clear" style="display:inline">' . csrf_field() . '
+           <button class="btn sec">Clear cart</button></form></p>'
         : '<p>Your cart is empty. <a href="/creations/shop">Keep shopping</a>.</p>');
     layout('Cart', $body);
+}
+
+function pg_cart_remove(): void
+{
+    check_csrf();
+    unset($_SESSION['cart'][(int) ($_POST['item_id'] ?? 0)]);
+    redirect('/cart');
+}
+
+function pg_cart_clear(): void
+{
+    check_csrf();
+    unset($_SESSION['cart']);
+    redirect('/cart');
 }
 
 function pg_checkout(): void
@@ -147,8 +166,9 @@ function pg_checkout(): void
             redirect('/checkout');
         }
         unset($_SESSION['cart']);
-        flash('Order placed! Invoice #' . $invId . ' — pay Cash / Bank / Mobile Money, then declare your payment.');
-        redirect($u ? '/my-glamorous' : '/login');
+        $_SESSION['last_order'] = ['order' => $orderId, 'invoice' => $invId];
+        flash('Order placed! Pay Cash / Bank / Mobile Money, then declare your payment below.');
+        redirect('/checkout/success');
     }
     $name = e($u['name'] ?? '');
     $phone = e($u['phone'] ?? '');
@@ -162,6 +182,34 @@ function pg_checkout(): void
       ' . field('Delivery address (if delivery)', '<textarea name="delivery_address" rows="2"></textarea>') . '
       ' . field('Contact phone (if delivery)', '<input name="contact_phone">') . '
       <button class="btn">Place order</button></form></div>');
+}
+
+/** Guest-friendly confirmation: no login required, reads the session receipt. */
+function pg_checkout_success(): void
+{
+    $ids = $_SESSION['last_order'] ?? null;
+    if (!$ids) {
+        redirect('/creations/shop');
+    }
+    $o = db_one(
+        'SELECT o.*, c.name AS company, k.name AS customer FROM sales_orders o
+         JOIN companies c ON c.id=o.company_id JOIN customers k ON k.id=o.customer_id WHERE o.id = ?',
+        [(int) $ids['order']]
+    );
+    $inv = db_one('SELECT * FROM invoices WHERE id = ?', [(int) $ids['invoice']]);
+    if (!$o || !$inv) {
+        redirect('/creations/shop');
+    }
+    $u = current_user();
+    layout('Order confirmed', '<h1>Order confirmed ' . brand_badge($o['company']) . '</h1>
+      <div class="card"><p>Thank you, ' . e($o['customer']) . '!</p>
+      <p>Order <strong>#' . (int) $o['id'] . '</strong> · Invoice <strong>#' . (int) $inv['id'] . '</strong><br>
+      Total: <strong>MWK ' . money((float) $o['grand_total']) . '</strong> · ' . e($o['fulfilment_method']) . '</p>
+      <p>Next: pay by Cash, Bank Transfer or Mobile Money, then
+      <a class="btn" href="/declare?invoice_id=' . (int) $inv['id'] . '">declare your payment</a></p>'
+      . ($u ? '<p><a href="/my-glamorous">Track it in My Glamorous</a></p>'
+            : '<p><a href="/register">Create an account</a> to track orders, or <a href="/login">log in</a>.</p>')
+      . '</div>');
 }
 
 function pg_delights(): void
@@ -221,13 +269,13 @@ function pg_request(): void
              post('event_date') ?: null, 'Website']
         );
         $enqId = db_last_id();
-        if ($etype === 'Cake') {
+        if (in_array($etype, ['Cake', 'Fritters', 'Other Bakery'], true)) {
             $prodId = (int) post('product_id');
             db_exec(
                 "INSERT INTO cake_orders (company_id, customer_id, order_type, product_item_id, quantity,
                  required_date, customization, reference_image, fulfilment_method, status)
                  VALUES (?,?,?,?,?,?,?,?,?, 'Awaiting Quotation')",
-                [$companyId, $customerId, 'Cake', $prodId, (float) post('quantity', '1'),
+                [$companyId, $customerId, $etype, $prodId, (float) post('quantity', '1'),
                  post('event_date') ?: date('Y-m-d'), post('message'), save_upload('reference_image', 'cake-refs'),
                  post('fulfilment_method', 'Customer Pickup')]
             );
@@ -242,7 +290,7 @@ function pg_request(): void
     }
     layout('Request', '<h1>Request a service ' . brand_badge(GD_NAME) . '</h1>
       <div class="card"><form method="post" enctype="multipart/form-data">' . csrf_field() . '
-      ' . field('Enquiry type', '<select name="enquiry_type"><option>Wedding</option><option>Catering</option><option>Rental</option><option>Cake</option><option>General</option></select>') . '
+      ' . field('Enquiry type', '<select name="enquiry_type"><option>Wedding</option><option>Catering</option><option>Rental</option><option>Cake</option><option>Fritters</option><option>Other Bakery</option><option>General</option></select>') . '
       ' . field('Your name', '<input name="name" required>') . '
       <div class="row2">' . field('Phone', '<input name="phone">') . field('Email', '<input name="email">') . '</div>
       ' . field('Event date', '<input type="date" name="event_date">') . '

@@ -96,3 +96,11 @@ function brand_badge(string $companyName): string
     $short = $companyName === GC_NAME ? 'Creations' : ($companyName === GD_NAME ? 'Delights' : $companyName);
     return '<span class="badge ' . $cls . '">' . e($short) . '</span>';
 }
+
+function item_img(?string $path, string $alt = ''): string
+{
+    if (!$path) {
+        return '';
+    }
+    return '<img src="/' . e($path) . '" alt="' . e($alt) . '" style="max-width:100%;border-radius:8px;margin-bottom:.5rem">';
+}

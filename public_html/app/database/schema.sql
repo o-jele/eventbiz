@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS items (
   default_warehouse_id INT UNSIGNED NULL,
   published TINYINT(1) NOT NULL DEFAULT 0,
   featured TINYINT(1) NOT NULL DEFAULT 0,
+  image_path VARCHAR(255) NULL,
   description TEXT NULL,
   FOREIGN KEY (item_group_id) REFERENCES item_groups(id),
   FOREIGN KEY (company_id) REFERENCES companies(id)
