@@ -61,7 +61,7 @@ a { color: var(--rose-deep); }
   letter-spacing: .02em;
   display: inline-flex; align-items: center; gap: .5rem;
 }
-.brand em { color: var(--rose); font-style: normal; }
+.brand em, .side-brand em, .foot h4 em { color: var(--rose); font-style: normal; font-size: 1.65em; line-height: 0; margin-left: -.12em; }
 .brand-logo { height: 46px; width: auto; border-radius: 10px; }
 .cat-logo { height: 74px; width: auto; max-width: 100%; object-fit: contain; margin-bottom: .8rem; mix-blend-mode: multiply; }
 .foot-logos { display: flex; gap: .8rem; margin-bottom: 1rem; }
