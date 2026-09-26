@@ -10,6 +10,7 @@ function staff_sidebar(): string
         'Desk' => [
             ['url' => '/admin', 'label' => 'Dashboards', 'icon' => 'dashboard'],
             ['url' => '/admin/enquiries', 'label' => 'Enquiries', 'icon' => 'enquiries'],
+            ['url' => '/admin/customers', 'label' => 'Customers', 'icon' => 'users'],
             ['url' => '/admin/pos', 'label' => 'POS', 'icon' => 'pos'],
             ['url' => '/admin/events', 'label' => 'Events', 'icon' => 'events'],
             ['url' => '/admin/catering', 'label' => 'Catering', 'icon' => 'catering'],
@@ -332,6 +333,28 @@ function pg_admin(): void
     foreach ($topCust as $c) {
         $topCustHtml .= '<li>' . e($c['name']) . ' <span class="t">MK' . number_format((float) $c['t']) . '</span></li>';
     }
+    $bdayRows = db_all('SELECT name, phone, birth_date FROM customers WHERE birth_date IS NOT NULL ORDER BY name LIMIT 200');
+    $bdays = [];
+    $nowDay = strtotime(date('Y-m-d'));
+    foreach ($bdayRows as $b) {
+        $md = date('m-d', strtotime((string) $b['birth_date']));
+        $yr = (int) date('Y');
+        $next = strtotime("$yr-$md");
+        if ($next < $nowDay) {
+            $next = strtotime(($yr + 1) . "-$md");
+        }
+        $in = (int) (($next - $nowDay) / 86400);
+        if ($in <= 6) {
+            $bdays[] = ['in' => $in, 'row' => $b, 'when' => date('D, j M', $next)];
+        }
+    }
+    usort($bdays, fn($a, $b) => $a['in'] <=> $b['in']);
+    $bdayHtml = '';
+    foreach ($bdays as $x) {
+        $bdayHtml .= '<li><strong>' . e($x['row']['name']) . '</strong><br><span class="t">'
+            . e($x['when']) . ($x['in'] === 0 ? ' · Today!' : ' · in ' . $x['in'] . ' days')
+            . ' · ' . e((string) ($x['row']['phone'] ?? '')) . '</span></li>';
+    }
     $topItemsHtml = '';
     foreach ($topItems as $it) {
         $topItemsHtml .= '<li>' . e($it['name']) . ' <span class="t">' . (int) $it['q'] . ' sold · MK' . number_format((float) $it['t']) . '</span></li>';
@@ -375,6 +398,7 @@ function pg_admin(): void
             : '')
         . '</div><div>'
         . '<div class="panel"><h3>Latest activity</h3><div class="tabs">' . $tabs . '</div>' . ($feedHtml ?: '<p class="mut">Nothing yet.</p>') . '</div>'
+        . '<div class="panel"><h3>Birthdays this week</h3>' . ($bdayHtml ? '<ul class="feed">' . $bdayHtml . '</ul>' : '<p class="mut">No birthdays coming up. Capture birth dates on the Customers page.</p>') . '</div>'
         . '<div class="panel"><h3>Inventory alerts</h3>' . ($invHtml ? '<ul class="feed">' . $invHtml . '</ul>' : '<p class="mut">Stock levels healthy.</p>') . '</div>'
         . '</div></div>'
         . '<script>(function(){function fmt(v,dec){return Number(v).toLocaleString("en-US",{minimumFractionDigits:dec,maximumFractionDigits:dec});}'

@@ -1126,3 +1126,76 @@ function pg_admin_warehouse(): void
       <button class="btn">Move</button></form></div>
       <h2>Recent moves</h2>' . ($mr ? table(['When', 'SKU', 'Qty', 'Warehouse', 'Ref'], $mr) : '<p class="mut">None.</p>'));
 }
+
+// ---------- Customers: capture + maintain customer details ----------
+function pg_admin_customers(): void
+{
+    require_staff();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_customer'])) {
+        check_csrf();
+        if (post('name') === '' || post('phone') === '') {
+            flash('Name and phone are required.', 'err');
+            redirect('/admin/customers');
+        }
+        $bd = post('birth_date') ?: null;
+        if ($bd && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $bd)) {
+            $bd = null;
+        }
+        db_exec(
+            'INSERT INTO customers (name, phone, whatsapp, email, preferred_contact, birth_date, notes)
+             VALUES (?,?,?,?,?,?,?)',
+            [post('name'), post('phone'), post('phone2') ?: post('phone'), post('email') ?: null,
+             post('preferred_contact', 'Phone'), $bd, post('notes') ?: null]
+        );
+        flash('Customer captured.');
+        redirect('/admin/customers');
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_customer'])) {
+        check_csrf();
+        $bd = post('birth_date') ?: null;
+        if ($bd && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $bd)) {
+            $bd = null;
+        }
+        db_exec(
+            'UPDATE customers SET name=?, phone=?, whatsapp=?, email=?, preferred_contact=?, birth_date=?, notes=? WHERE id=?',
+            [post('name'), post('phone'), post('phone2') ?: post('phone'), post('email') ?: null,
+             post('preferred_contact', 'Phone'), $bd, post('notes') ?: null, (int) $_POST['edit_customer']]
+        );
+        flash('Customer updated.');
+        redirect('/admin/customers');
+    }
+    if (($_GET['edit'] ?? '') !== '') {
+        $c = db_one('SELECT * FROM customers WHERE id = ?', [(int) $_GET['edit']]);
+        if (!$c) {
+            redirect('/admin/customers');
+        }
+        layout('Edit customer', admin_nav() . '<h1>Edit customer</h1><div class="card"><form method="post">' . csrf_field() . '
+          <input type="hidden" name="edit_customer" value="' . (int) $c['id'] . '">
+          <div class="row2">' . field('Name', '<input name="name" required value="' . e($c['name']) . '">') . field('Phone', '<input name="phone" required value="' . e($c['phone']) . '">') . '</div>
+          <div class="row2">' . field('WhatsApp', '<input name="phone2" value="' . e((string) ($c['whatsapp'] ?? '')) . '">') . field('Email', '<input name="email" type="email" value="' . e((string) ($c['email'] ?? '')) . '">') . '</div>
+          <div class="row2">' . field('Preferred contact', '<select name="preferred_contact"><option' . ($c['preferred_contact'] === 'Phone' ? ' selected' : '') . '>Phone</option><option' . ($c['preferred_contact'] === 'WhatsApp' ? ' selected' : '') . '>WhatsApp</option><option' . ($c['preferred_contact'] === 'Email' ? ' selected' : '') . '>Email</option></select>') . field('Birthday', '<input type="date" name="birth_date" value="' . e((string) ($c['birth_date'] ?? '')) . '">') . '</div>
+          ' . field('Notes (allergies, preferences, addresses)', '<textarea name="notes" rows="2">' . e((string) ($c['notes'] ?? '')) . '</textarea>') . '
+          <button class="btn">Save</button></form></div>');
+        return;
+    }
+    $rows = db_all(
+        'SELECT k.*, (SELECT COUNT(*) FROM sales_orders o WHERE o.customer_id = k.id) AS orders,
+          (SELECT COALESCE(SUM(total - paid),0) FROM invoices i WHERE i.customer_id = k.id) AS bal
+         FROM customers k ORDER BY k.name LIMIT 200'
+    );
+    $tr = [];
+    foreach ($rows as $r) {
+        $tr[] = [e($r['name']) . '<br><span class="mut">' . e((string) ($r['phone'] ?? '')) . '</span>',
+                 e((string) ($r['email'] ?? '')), e((string) ($r['birth_date'] ?? '')),
+                 (int) $r['orders'], 'MK' . number_format((float) $r['bal']),
+                 '<a href="/admin/customers?edit=' . (int) $r['id'] . '">Edit</a>'];
+    }
+    layout('Customers', admin_nav() . '<h1>Customers</h1>'
+        . ($tr ? table(['Customer', 'Email', 'Birthday', 'Orders', 'Owes', ''], $tr) : '<p class="mut">No customers yet.</p>') . '
+      <h2>New customer</h2><div class="card"><form method="post">' . csrf_field() . '<input type="hidden" name="new_customer" value="1">
+      <div class="row2">' . field('Name', '<input name="name" required>') . field('Phone', '<input name="phone" required inputmode="tel">') . '</div>
+      <div class="row2">' . field('WhatsApp (if different)', '<input name="phone2" inputmode="tel">') . field('Email', '<input name="email" type="email">') . '</div>
+      <div class="row2">' . field('Preferred contact', '<select name="preferred_contact"><option>Phone</option><option>WhatsApp</option><option>Email</option></select>') . field('Birthday', '<input type="date" name="birth_date">') . '</div>
+      ' . field('Notes', '<textarea name="notes" rows="2"></textarea>') . '
+      <button class="btn">Capture customer</button></form></div>');
+}

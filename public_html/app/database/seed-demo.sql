@@ -110,15 +110,24 @@ VALUES
     (SELECT id FROM item_groups WHERE name='Event Staffing'),
     (SELECT id FROM companies WHERE abbr='GD'), 'Day', 'service', 'Shared', 15000, 25000, 0, 0, NULL, 1, '');
 
-INSERT INTO customers (name, phone, whatsapp, email) VALUES
-  ('Jane Banda', '0999111000', '0999111000', 'jane@demo.mw'),
-  ('Chikondi Phiri', '0999222000', '', '');
+INSERT INTO customers (name, phone, whatsapp, email)
+SELECT 'Jane Banda', '0999111000', '0999111000', 'jane@demo.mw' FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM customers WHERE email = 'jane@demo.mw');
+
+INSERT INTO customers (name, phone, whatsapp, email)
+SELECT 'Chikondi Phiri', '0999222000', '', '' FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM customers WHERE name = 'Chikondi Phiri' AND phone = '0999222000');
+
+UPDATE customers
+SET birth_date = STR_TO_DATE(CONCAT('1995-', DATE_FORMAT(CURDATE() + INTERVAL 3 DAY, '%m-%d')), '%Y-%m-%d')
+WHERE email = 'jane@demo.mw';
 
 INSERT IGNORE INTO suppliers (name, phone) VALUES
   ('Lilongwe Millers', '0999333000');
 
 -- Demo logins, all password DemoPass123! (bcrypt below is that password).
-INSERT INTO users (name, email, password_hash, role, customer_id) VALUES
+-- IGNORE makes re-runs safe (emails are unique).
+INSERT IGNORE INTO users (name, email, password_hash, role, customer_id) VALUES
   ('Accounts', 'accounts@glamorous.mw',
    '$2y$12$EQZx6WEkaAQwGgoMvlQgHebK4gqt.GYEUG9rslME3OOnWQ3Y38xRC', 'accounts', NULL),
   ('Delights Sales', 'sales@glamorous.mw',
@@ -131,30 +140,44 @@ INSERT INTO users (name, email, password_hash, role, customer_id) VALUES
 
 -- Demo event + draft quotation + draft booking (safe: Draft holds no stock).
 -- Dates are relative so the dashboard demo stays alive whenever this is loaded.
-INSERT INTO events (company_id, customer_id, name, event_type, event_date, venue, guests, contact_person, contact_phone, status) VALUES
-  ((SELECT id FROM companies WHERE abbr='GD'),
-   (SELECT id FROM customers WHERE email='jane@demo.mw'),
-   'Demo Wedding - Banda', 'Wedding', CURDATE() + INTERVAL 10 DAY, 'Bingu Hall', 200,
-   'Jane Banda', '0999111000', 'Enquiry');
-SET @ev = LAST_INSERT_ID();
-SET @cu = (SELECT id FROM customers WHERE email='jane@demo.mw');
-SET @gd = (SELECT id FROM companies WHERE abbr='GD');
+-- Every block is guarded: re-running this file changes nothing.
+SET @cu = (SELECT id FROM customers WHERE email = 'jane@demo.mw');
+SET @gd = (SELECT id FROM companies WHERE abbr = 'GD');
 
-INSERT INTO quotations (company_id, customer_id, event_id, subtotal, delivery_setup, grand_total, deposit_required, valid_until, status) VALUES
-  (@gd, @cu, @ev, 2850000, 0, 2850000, 800000, CURDATE() + INTERVAL 7 DAY, 'Draft');
-SET @q = LAST_INSERT_ID();
+INSERT INTO events (company_id, customer_id, name, event_type, event_date, venue, guests, contact_person, contact_phone, status)
+SELECT @gd, @cu, 'Demo Wedding - Banda', 'Wedding', CURDATE() + INTERVAL 10 DAY, 'Bingu Hall', 200,
+  'Jane Banda', '0999111000', 'Enquiry' FROM DUAL
+WHERE @cu IS NOT NULL AND NOT EXISTS (SELECT 1 FROM events WHERE name = 'Demo Wedding - Banda');
+SET @ev = (SELECT id FROM events WHERE name = 'Demo Wedding - Banda' ORDER BY id LIMIT 1);
 
-INSERT INTO quotation_services (quotation_id, service_type, item_id, description, qty, rate, amount) VALUES
-  (@q, 'Rental', (SELECT id FROM items WHERE sku='CHR-001'), '200x plastic chairs', 200, 2000, 400000),
-  (@q, 'Catering', (SELECT id FROM items WHERE sku='MENU-A'), '200x Wedding Menu A', 200, 12000, 2400000),
-  (@q, 'Delivery', (SELECT id FROM items WHERE sku='DLV-001'), 'Delivery to Bingu Hall', 1, 50000, 50000);
+INSERT INTO quotations (company_id, customer_id, event_id, subtotal, delivery_setup, grand_total, deposit_required, valid_until, status)
+SELECT @gd, @cu, @ev, 2850000, 0, 2850000, 800000, CURDATE() + INTERVAL 7 DAY, 'Draft' FROM DUAL
+WHERE @ev IS NOT NULL AND NOT EXISTS (SELECT 1 FROM quotations WHERE event_id = @ev);
+SET @q = (SELECT id FROM quotations WHERE event_id = @ev ORDER BY id LIMIT 1);
+
+INSERT INTO quotation_services (quotation_id, service_type, item_id, description, qty, rate, amount)
+SELECT @q, 'Rental', (SELECT id FROM items WHERE sku='CHR-001'), '200x plastic chairs', 200, 2000, 400000 FROM DUAL
+WHERE @q IS NOT NULL AND NOT EXISTS (SELECT 1 FROM quotation_services WHERE quotation_id = @q);
+
+INSERT INTO quotation_services (quotation_id, service_type, item_id, description, qty, rate, amount)
+SELECT @q, 'Catering', (SELECT id FROM items WHERE sku='MENU-A'), '200x Wedding Menu A', 200, 12000, 2400000 FROM DUAL
+WHERE @q IS NOT NULL AND NOT EXISTS (SELECT 1 FROM quotation_services WHERE quotation_id = @q);
+
+INSERT INTO quotation_services (quotation_id, service_type, item_id, description, qty, rate, amount)
+SELECT @q, 'Delivery', (SELECT id FROM items WHERE sku='DLV-001'), 'Delivery to Bingu Hall', 1, 50000, 50000 FROM DUAL
+WHERE @q IS NOT NULL AND NOT EXISTS (SELECT 1 FROM quotation_services WHERE quotation_id = @q);
 
 INSERT INTO rental_bookings (company_id, customer_id, event_id, booking_date, event_date, return_expected,
-  fulfilment_method, delivery_charge, rental_total, grand_total, deposit_required, status) VALUES
-  (@gd, @cu, @ev, CURDATE(), CURDATE() + INTERVAL 10 DAY, CURDATE() + INTERVAL 12 DAY, 'Delivery', 50000, 600000, 650000, 200000, 'Draft');
+  fulfilment_method, delivery_charge, rental_total, grand_total, deposit_required, status)
+SELECT @gd, @cu, @ev, CURDATE(), CURDATE() + INTERVAL 10 DAY, CURDATE() + INTERVAL 12 DAY,
+  'Delivery', 50000, 600000, 650000, 200000, 'Draft' FROM DUAL
+WHERE @ev IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rental_bookings WHERE event_id = @ev);
+SET @b = (SELECT id FROM rental_bookings WHERE event_id = @ev ORDER BY id LIMIT 1);
 
-SET @b = LAST_INSERT_ID();
+INSERT INTO rental_booking_items (booking_id, item_id, qty, rate, amount)
+SELECT @b, (SELECT id FROM items WHERE sku='CHR-001'), 200, 2000, 400000 FROM DUAL
+WHERE @b IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rental_booking_items WHERE booking_id = @b);
 
-INSERT INTO rental_booking_items (booking_id, item_id, qty, rate, amount) VALUES
-  (@b, (SELECT id FROM items WHERE sku='CHR-001'), 200, 2000, 400000),
-  (@b, (SELECT id FROM items WHERE sku='TBL-008'), 25, 8000, 200000);
+INSERT INTO rental_booking_items (booking_id, item_id, qty, rate, amount)
+SELECT @b, (SELECT id FROM items WHERE sku='TBL-008'), 25, 8000, 200000 FROM DUAL
+WHERE @b IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rental_booking_items WHERE booking_id = @b);

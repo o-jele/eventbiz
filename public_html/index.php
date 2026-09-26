@@ -81,6 +81,7 @@ $routes = [
     '/admin/settings' => 'pg_admin_settings',
     '/password' => 'pg_password',
     '/admin/enquiries' => 'pg_admin_enquiries',
+    '/admin/customers' => 'pg_admin_customers',
     '/admin/events' => 'pg_admin_events',
     '/admin/rentals' => 'pg_admin_rentals',
     '/admin/payments' => 'pg_admin_payments',

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS customers (
   whatsapp VARCHAR(40) NULL,
   email VARCHAR(150) NULL,
   preferred_contact VARCHAR(20) NOT NULL DEFAULT 'Phone',
+  birth_date DATE NULL,
   notes TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_cust_phone (phone)
