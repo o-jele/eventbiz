@@ -271,3 +271,19 @@ a.card { text-decoration: none; color: inherit; display: block; }
 .feed li:last-child { border-bottom: 0; }
 .feed .t { color: var(--mut); font-size: .8rem; }
 @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+
+/* ---------- counter-sale register ---------- */
+.pos-grid { display: grid; grid-template-columns: 8fr 5fr; gap: 1.2rem; align-items: start; }
+#pos-search {
+  width: 100%; padding: .8rem 1rem; font-size: 1.05rem; font-family: var(--font-body);
+  border: 2px solid var(--blush-deep); border-radius: var(--r-md); background: #fff;
+}
+#pos-search:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(222, 127, 184, .18); }
+#pos-suggest { display: flex; flex-direction: column; gap: .35rem; margin-top: .5rem; }
+#pos-suggest button {
+  text-align: left; background: #fff; border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: .55rem .8rem; cursor: pointer; font-family: var(--font-body); font-size: .95rem;
+}
+#pos-suggest button:hover { border-color: var(--rose); background: #FFF0F6; }
+.pos-totals .pos-grand { font-weight: 700; font-size: 2rem; color: var(--wine); margin: .2rem 0; }
+@media (max-width: 900px) { .pos-grid { grid-template-columns: 1fr; } }

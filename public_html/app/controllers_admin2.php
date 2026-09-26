@@ -273,112 +273,366 @@ function rental_ensure_invoice(int $bookingId, array $u): int
     return $inv;
 }
 
-// ---------- Counter-sale POS (Creations walk-in) ----------
-function pos_item_options(): string
+// ---------- Counter-sale register (Creations walk-in) ----------
+// Layout & flow borrow heavily from OpenSourcePOS 3.4 (MIT licence):
+// find/scan bar with suggestions, editable cart lines with line discounts,
+// customer attach, tendered/change, suspend-resume, keyboard shortcuts.
+// Rebuilt here dependency-free (no jQuery/Bootstrap) in the Glamorous theme.
+const POS_ROLES = ['admin', 'accounts', 'creations_staff'];
+
+function pos_cart(): array
 {
-    $items = db_all(
-        "SELECT id, name, price, stock_qty FROM items WHERE published = 1 AND item_type = 'stock'
-         AND business_unit IN ('Creations','Shared') ORDER BY name"
-    );
-    $o = '<option value="">— pick product —</option>';
-    foreach ($items as $i) {
-        $o .= '<option value="' . (int) $i['id'] . '">' . e($i['name']) . ' (stock ' . e((string) $i['stock_qty']) . ', ' . money((float) $i['price']) . ')</option>';
+    return $_SESSION['pos_cart'] ?? [];
+}
+
+function pos_save_cart(array $c): void
+{
+    $_SESSION['pos_cart'] = $c;
+}
+
+function pos_customer(): array
+{
+    return $_SESSION['pos_customer'] ?? ['name' => 'Walk-in', 'phone' => ''];
+}
+
+function pos_totals(array $cart): array
+{
+    $lines = [];
+    $sub = 0;
+    $disc = 0;
+    $units = 0;
+    foreach ($cart as $id => $l) {
+        $it = db_one('SELECT id, sku, name, price, stock_qty FROM items WHERE id = ?', [(int) $id]);
+        if (!$it) {
+            continue;
+        }
+        $qty = max(0, (float) ($l['qty'] ?? 0));
+        if ($qty <= 0) {
+            continue;
+        }
+        $dpct = min(100, max(0, (float) ($l['discount'] ?? 0)));
+        $gross = $qty * (float) $it['price'];
+        $d = $gross * $dpct / 100;
+        $sub += $gross;
+        $disc += $d;
+        $units += $qty;
+        $lines[] = ['id' => (int) $id, 'sku' => $it['sku'], 'name' => $it['name'],
+                    'price' => (float) $it['price'], 'stock' => (float) $it['stock_qty'],
+                    'qty' => $qty, 'discount' => $dpct, 'amount' => $gross - $d];
     }
-    return $o;
+    return ['lines' => $lines, 'units' => $units, 'subtotal' => $sub, 'discount' => $disc, 'total' => $sub - $disc];
 }
 
 function pg_admin_pos(): void
 {
-    $u = require_role(['admin', 'accounts', 'creations_staff']);
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        check_csrf();
-        $companyId = company_id(GC_NAME);
-        guard_company(GC_NAME);
-        $name = post('customer_name', 'Walk-in') ?: 'Walk-in';
-        $phone = post('phone');
-        if ($phone !== '') {
-            $cid = find_or_create_customer($name, $phone);
-        } else {
-            $row = db_one("SELECT id FROM customers WHERE name = 'Walk-in' ORDER BY id LIMIT 1");
-            if ($row) {
-                $cid = (int) $row['id'];
-            } else {
-                db_exec("INSERT INTO customers (name, phone) VALUES ('Walk-in','')");
-                $cid = db_last_id();
-            }
-        }
-        $wh = db_one('SELECT * FROM warehouses WHERE name = ?', ['CREATIONS - SHOP - GC']);
-        $itemIds = $_POST['item_id'] ?? [];
-        $qtys = $_POST['qty'] ?? [];
-        db()->beginTransaction();
-        try {
-            db_exec(
-                "INSERT INTO sales_orders (company_id, customer_id, status, fulfilment_method, delivery_status, created_by)
-                 VALUES (?,?,'Confirmed','Customer Pickup','Not Required',?)",
-                [$companyId, $cid, (int) $u['id']]
-            );
-            $oid = db_last_id();
-            $sub = 0;
-            $n = 0;
-            foreach ($itemIds as $k => $iid) {
-                $iid = (int) $iid;
-                $q = (float) ($qtys[$k] ?? 0);
-                if (!$iid || $q <= 0) {
-                    continue;
-                }
-                $it = db_one('SELECT * FROM items WHERE id = ? FOR UPDATE', [$iid]);
-                if (!$it || (float) $it['stock_qty'] < $q) {
-                    throw new RuntimeException('Insufficient stock for ' . ($it['name'] ?? "#$iid") . '.');
-                }
-                $amt = $q * (float) $it['price'];
-                $sub += $amt;
-                $n++;
-                db_exec('INSERT INTO sales_order_items (order_id, item_id, description, qty, rate, amount) VALUES (?,?,?,?,?,?)',
-                    [$oid, $iid, $it['name'], $q, $it['price'], $amt]);
-                post_stock($iid, (int) $wh['id'], -$q, 'sales_order', $oid, 'Counter sale');
-            }
-            if ($n === 0) {
-                throw new RuntimeException('Add at least one product row.');
-            }
-            db_exec('UPDATE sales_orders SET subtotal=?, grand_total=? WHERE id=?', [$sub, $sub, $oid]);
-            $inv = make_invoice($companyId, $cid, $oid, 'Counter sale #' . $oid, $sub);
-            db_exec(
-                "INSERT INTO payments (company_id, customer_id, invoice_id, kind, amount, method, reference, payment_date, received_by)
-                 VALUES (?,?,?, 'invoice', ?,?,?,?,?)",
-                [$companyId, $cid, $inv, $sub, post('method', 'Cash'), post('reference') ?: null, date('Y-m-d'), (int) $u['id']]
-            );
-            refresh_invoice($inv);
-            db()->commit();
-        } catch (Throwable $ex) {
-            db()->rollBack();
-            flash($ex->getMessage(), 'err');
-            redirect('/admin/pos');
-        }
-        flash('Sale #' . $oid . ' recorded — MWK ' . money($sub) . ' paid.');
-        redirect('/admin/pos');
+    $u = require_role(POS_ROLES);
+    guard_company(GC_NAME);
+    $cart = pos_cart();
+    $cust = pos_customer();
+    $t = pos_totals($cart);
+    $suspended = db_all(
+        'SELECT s.*, u.name AS staff FROM suspended_sales s LEFT JOIN users u ON u.id = s.staff_id ORDER BY s.id DESC LIMIT 10'
+    );
+    $susHtml = '';
+    foreach ($suspended as $s) {
+        $susHtml .= '<li>#' . (int) $s['id'] . ' ' . e((string) ($s['customer_name'] ?: 'Walk-in'))
+            . ' <span class="t">' . e((string) ($s['staff'] ?? '')) . ' · ' . e($s['created_at']) . '</span>'
+            . ' <form method="post" action="/admin/pos/resume" style="display:inline">' . csrf_field() . '
+               <input type="hidden" name="id" value="' . (int) $s['id'] . '"><button class="btn sec">Resume</button></form>'
+            . ' <form method="post" action="/admin/pos/suspend-delete" style="display:inline" onsubmit="return confirm(\'Delete this parked sale?\')">' . csrf_field() . '
+               <input type="hidden" name="id" value="' . (int) $s['id'] . '"><button class="btn sec">Delete</button></form></li>';
     }
-    $opts = pos_item_options();
     $rows = '';
-    for ($n = 0; $n < 5; $n++) {
-        $rows .= '<tr><td><select name="item_id[]">' . $opts . '</select></td><td><input name="qty[]" value="0"></td></tr>';
+    foreach ($t['lines'] as $l) {
+        $rows .= '<tr><td><form method="post" action="/admin/pos/remove" style="display:inline">' . csrf_field() . '
+          <input type="hidden" name="item_id" value="' . (int) $l['id'] . '"><button class="btn sec">×</button></form></td>
+          <td>' . e($l['sku']) . '<br><span class="t">stock ' . e((string) $l['stock']) . '</span></td>
+          <td>' . e($l['name']) . '</td><td>' . money($l['price']) . '</td>
+          <td><form method="post" action="/admin/pos/update">' . csrf_field() . '
+          <input type="hidden" name="item_id" value="' . (int) $l['id'] . '">
+          <input name="qty" value="' . e((string) $l['qty']) . '" size="4" inputmode="decimal"></td>
+          <td><input name="discount" value="' . e((string) $l['discount']) . '" size="4" inputmode="decimal" title="% off"></td>
+          <td>' . money($l['amount']) . '</td>
+          <td><button class="btn sec">Update</button></form></td></tr>';
     }
     $today = db_all(
         'SELECT o.id, o.grand_total, k.name AS customer FROM sales_orders o JOIN customers k ON k.id=o.customer_id
-         WHERE o.company_id = ? AND DATE(o.created_at) = CURDATE() ORDER BY o.id DESC LIMIT 20',
+         WHERE o.company_id = ? AND DATE(o.created_at) = CURDATE() ORDER BY o.id DESC LIMIT 12',
         [company_id(GC_NAME)]
     );
     $tr = [];
-    foreach ($today as $t) {
-        $tr[] = ['#' . $t['id'], e($t['customer']), money((float) $t['grand_total'])];
+    foreach ($today as $x) {
+        $tr[] = ['#' . $x['id'], e($x['customer']), money((float) $x['grand_total'])];
     }
     layout('Counter sale', admin_nav() . '<h1>Counter sale ' . brand_badge(GC_NAME) . '</h1>
-      <div class="card"><form method="post">' . csrf_field() . '
-      ' . field('Customer (leave Walk-in for anonymous)', '<input name="customer_name" value="Walk-in">') . '
-      ' . field('Phone (optional)', '<input name="phone">') . '
-      <table class="tbl"><thead><tr><th>Product</th><th>Qty</th></tr></thead><tbody>' . $rows . '</tbody></table>
-      <div class="row2">' . field('Method', '<select name="method"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Other Manual</option></select>') . field('Reference (bank/mobile)', '<input name="reference">') . '</div>
-      <button class="btn">Record paid sale</button></form></div>
-      <h2>Today</h2>' . ($tr ? table(['#', 'Customer', 'Total'], $tr) : '<p class="mut">No sales today.</p>'));
+    <div class="pos-grid"><div>
+      <div class="card"><h3>Find or scan item <span class="mut small">(Alt+1)</span></h3>
+        <input id="pos-search" placeholder="Type SKU or name…" autocomplete="off">
+        <div id="pos-suggest"></div>
+        <form id="pos-add" method="post" action="/admin/pos/add">' . csrf_field() . '<input type="hidden" name="item_id" id="pos-add-id"></form>
+      </div>
+      <div class="card"><h3>Cart (' . count($t['lines']) . ' lines)</h3>'
+      . ($rows
+          ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>SKU</th><th>Item</th><th>Price</th><th>Qty</th><th>% off</th><th>Total</th><th></th></tr></thead><tbody>' . $rows . '</tbody></table></div>
+            <p><form method="post" action="/admin/pos/suspend" style="display:inline">' . csrf_field() . '<button class="btn sec">Park sale</button></form>
+            <form method="post" action="/admin/pos/cancel" style="display:inline" onsubmit="return confirm(\'Clear this sale?\')">' . csrf_field() . '<button class="btn sec">Cancel sale</button></form></p>'
+          : '<p class="mut">No items yet — search above or scan.</p>')
+      . '</div>'
+      . ($susHtml ? '<div class="card"><h3>Parked sales</h3><ul class="feed">' . $susHtml . '</ul></div>' : '') . '
+    </div><div>
+      <div class="card"><h3>Customer</h3>
+        <form method="post" action="/admin/pos/customer">' . csrf_field() . '
+        <div class="row2">' . field('Name', '<input name="name" value="' . e($cust['name']) . '">') . field('Phone', '<input name="phone" value="' . e($cust['phone']) . '" inputmode="tel">') . '</div>
+        <button class="btn sec">Attach</button></form></div>
+      <div class="card pos-totals"><h3>Totals</h3>
+        <p>Items: <strong>' . e((string) $t['units']) . '</strong><br>Subtotal: MWK ' . money($t['subtotal'])
+        . '<br>Discount: MWK ' . money($t['discount']) . '</p>
+        <p class="pos-grand">MWK ' . money($t['total']) . '</p></div>
+      <div class="card"><h3>Take payment</h3>
+        <form method="post" action="/admin/pos/complete">' . csrf_field() . '
+        ' . field('Method', '<select name="method"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Other Manual</option></select>') . '
+        ' . field('Amount tendered (Alt+5)', '<input id="pos-tendered" name="tendered" inputmode="decimal" data-total="' . $t['total'] . '" value="' . $t['total'] . '">') . '
+        <p>Change due: <strong id="pos-change">MWK 0.00</strong></p>
+        ' . field('Reference (bank/mobile)', '<input name="reference">') . '
+        <button class="btn">Complete sale</button></form></div>
+    </div></div>
+    <h2>Today</h2>' . ($tr ? table(['#', 'Customer', 'Total'], $tr) : '<p class="mut">No sales today.</p>') . '
+    <script>
+    (function () {
+      function esc(s) { s = String(s); var q = String.fromCharCode(34), sq = String.fromCharCode(39); return s.split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;").split(q).join("&quot;").split(sq).join("&#39;"); }
+      var si = document.getElementById("pos-search"), box = document.getElementById("pos-suggest"), items = [];
+      si.addEventListener("input", function () {
+        var q = si.value.trim();
+        if (q.length < 2) { box.innerHTML = ""; return; }
+        fetch("/admin/pos/suggest?q=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (d) {
+          items = d;
+          box.innerHTML = d.map(function (it, i) {
+            return "<button type=\'button\' data-i=\'" + i + "\'>" + esc(it.sku) + " — " + esc(it.name) + " <b>MWK " + it.price + "</b> (" + it.stock + " in stock)</button>";
+          }).join("");
+          box.querySelectorAll("button").forEach(function (b) {
+            b.onclick = function () {
+              document.getElementById("pos-add-id").value = items[+b.dataset.i].id;
+              document.getElementById("pos-add").submit();
+            };
+          });
+        });
+      });
+      si.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && items.length) {
+          e.preventDefault();
+          document.getElementById("pos-add-id").value = items[0].id;
+          document.getElementById("pos-add").submit();
+        }
+      });
+      var ten = document.getElementById("pos-tendered"), chg = document.getElementById("pos-change");
+      function upd() {
+        var v = parseFloat((ten.value || "0").replace(/,/g, "")) || 0;
+        var c = v - parseFloat(ten.dataset.total || "0");
+        chg.textContent = "MWK " + (c < 0 ? "0.00" : c.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+      }
+      if (ten) { ten.addEventListener("input", upd); upd(); }
+      document.addEventListener("keydown", function (e) {
+        if (e.altKey && e.key === "1") { e.preventDefault(); si.focus(); si.select(); }
+        if (e.altKey && e.key === "5") { e.preventDefault(); if (ten) { ten.focus(); ten.select(); } }
+      });
+    })();
+    </script>');
+}
+
+function pg_pos_suggest(): void
+{
+    require_role(POS_ROLES);
+    guard_company(GC_NAME);
+    $q = '%' . trim($_GET['q'] ?? '') . '%';
+    header('Content-Type: application/json');
+    if (strlen(trim($_GET['q'] ?? '')) < 2) {
+        echo '[]';
+        exit;
+    }
+    $rows = db_all(
+        "SELECT id, sku, name, price, stock_qty AS stock FROM items
+         WHERE published = 1 AND item_type = 'stock' AND business_unit IN ('Creations','Shared')
+           AND (sku LIKE ? OR name LIKE ?) ORDER BY name LIMIT 8", [$q, $q]
+    );
+    echo json_encode($rows);
+    exit;
+}
+
+function pg_pos_add(): void
+{
+    require_role(POS_ROLES);
+    check_csrf();
+    $id = 0;
+    if (!empty($_POST['item_id'])) {
+        $id = (int) $_POST['item_id'];
+    } elseif (!empty($_POST['sku'])) {
+        $row = db_one('SELECT id FROM items WHERE sku = ? AND published = 1', [trim($_POST['sku'])]);
+        $id = $row ? (int) $row['id'] : 0;
+    }
+    if ($id) {
+        $it = db_one("SELECT id FROM items WHERE id = ? AND published = 1 AND item_type = 'stock'", [$id]);
+        if ($it) {
+            $cart = pos_cart();
+            $cart[$id] = ['qty' => (float) ($cart[$id]['qty'] ?? 0) + 1, 'discount' => (float) ($cart[$id]['discount'] ?? 0)];
+            pos_save_cart($cart);
+        } else {
+            flash('Item is not sellable here.', 'err');
+        }
+    }
+    redirect('/admin/pos');
+}
+
+function pg_pos_update(): void
+{
+    require_role(POS_ROLES);
+    check_csrf();
+    $id = (int) ($_POST['item_id'] ?? 0);
+    $cart = pos_cart();
+    if ($id && isset($cart[$id])) {
+        $qty = max(0, (float) ($_POST['qty'] ?? 0));
+        if ($qty <= 0) {
+            unset($cart[$id]);
+        } else {
+            $cart[$id] = ['qty' => $qty, 'discount' => min(100, max(0, (float) ($_POST['discount'] ?? 0)))];
+        }
+        pos_save_cart($cart);
+    }
+    redirect('/admin/pos');
+}
+
+function pg_pos_remove(): void
+{
+    require_role(POS_ROLES);
+    check_csrf();
+    $cart = pos_cart();
+    unset($cart[(int) ($_POST['item_id'] ?? 0)]);
+    pos_save_cart($cart);
+    redirect('/admin/pos');
+}
+
+function pg_pos_customer(): void
+{
+    require_role(POS_ROLES);
+    check_csrf();
+    $_SESSION['pos_customer'] = ['name' => post('name', 'Walk-in') ?: 'Walk-in', 'phone' => post('phone')];
+    redirect('/admin/pos');
+}
+
+function pg_pos_suspend(): void
+{
+    $u = require_role(POS_ROLES);
+    check_csrf();
+    $cart = pos_cart();
+    if (!$cart) {
+        flash('Nothing to park.', 'err');
+        redirect('/admin/pos');
+    }
+    $cust = pos_customer();
+    db_exec('INSERT INTO suspended_sales (staff_id, customer_name, customer_phone, payload) VALUES (?,?,?,?)',
+        [(int) $u['id'], $cust['name'], $cust['phone'], json_encode($cart)]);
+    unset($_SESSION['pos_cart'], $_SESSION['pos_customer']);
+    flash('Sale parked (#' . db_last_id() . ').');
+    redirect('/admin/pos');
+}
+
+function pg_pos_resume(): void
+{
+    require_role(POS_ROLES);
+    check_csrf();
+    $s = db_one('SELECT * FROM suspended_sales WHERE id = ?', [(int) ($_POST['id'] ?? 0)]);
+    if (!$s) {
+        redirect('/admin/pos');
+    }
+    $_SESSION['pos_cart'] = json_decode($s['payload'], true) ?: [];
+    $_SESSION['pos_customer'] = ['name' => (string) ($s['customer_name'] ?: 'Walk-in'), 'phone' => (string) ($s['customer_phone'] ?? '')];
+    db_exec('DELETE FROM suspended_sales WHERE id = ?', [(int) $s['id']]);
+    flash('Parked sale resumed.');
+    redirect('/admin/pos');
+}
+
+function pg_pos_suspend_delete(): void
+{
+    require_role(POS_ROLES);
+    check_csrf();
+    db_exec('DELETE FROM suspended_sales WHERE id = ?', [(int) ($_POST['id'] ?? 0)]);
+    redirect('/admin/pos');
+}
+
+function pg_pos_cancel(): void
+{
+    require_role(POS_ROLES);
+    check_csrf();
+    unset($_SESSION['pos_cart'], $_SESSION['pos_customer']);
+    flash('Sale cleared.');
+    redirect('/admin/pos');
+}
+
+function pg_pos_complete(): void
+{
+    $u = require_role(POS_ROLES);
+    check_csrf();
+    $companyId = company_id(GC_NAME);
+    guard_company(GC_NAME);
+    $cart = pos_cart();
+    $t = pos_totals($cart);
+    if (!$t['lines']) {
+        flash('Cart is empty.', 'err');
+        redirect('/admin/pos');
+    }
+    $tendered = (float) post('tendered', '0');
+    if ($tendered < $t['total']) {
+        flash('Tendered MWK ' . money($tendered) . ' is less than the MWK ' . money($t['total']) . ' total.', 'err');
+        redirect('/admin/pos');
+    }
+    $change = $tendered - $t['total'];
+    $cust = pos_customer();
+    $cid = $cust['phone'] !== ''
+        ? find_or_create_customer($cust['name'], $cust['phone'])
+        : walkin_customer_id();
+    $wh = db_one('SELECT * FROM warehouses WHERE name = ?', ['CREATIONS - SHOP - GC']);
+    db()->beginTransaction();
+    try {
+        db_exec(
+            "INSERT INTO sales_orders (company_id, customer_id, status, fulfilment_method, delivery_status, subtotal, discount_total, grand_total, tendered, change_due, created_by)
+             VALUES (?,?, 'Confirmed','Customer Pickup','Not Required', ?,?,?,?,?,?)",
+            [$companyId, $cid, $t['subtotal'], $t['discount'], $t['total'], $tendered, $change, (int) $u['id']]
+        );
+        $oid = db_last_id();
+        foreach ($t['lines'] as $l) {
+            $it = db_one('SELECT * FROM items WHERE id = ? FOR UPDATE', [$l['id']]);
+            if (!$it || (float) $it['stock_qty'] < $l['qty']) {
+                throw new RuntimeException('Insufficient stock for ' . ($it['name'] ?? ('#' . $l['id'])) . '.');
+            }
+            db_exec('INSERT INTO sales_order_items (order_id, item_id, description, qty, rate, discount_pct, amount) VALUES (?,?,?,?,?,?,?)',
+                [$oid, $l['id'], $l['name'], $l['qty'], $l['price'], $l['discount'], $l['amount']]);
+            post_stock($l['id'], (int) $wh['id'], -$l['qty'], 'sales_order', $oid, 'Counter sale');
+        }
+        $inv = make_invoice($companyId, $cid, $oid, 'Counter sale #' . $oid, $t['total']);
+        db_exec(
+            "INSERT INTO payments (company_id, customer_id, invoice_id, kind, amount, method, reference, payment_date, received_by)
+             VALUES (?,?,?, 'invoice', ?,?,?,?,?)",
+            [$companyId, $cid, $inv, $t['total'], post('method', 'Cash'), post('reference') ?: null, date('Y-m-d'), (int) $u['id']]
+        );
+        refresh_invoice($inv);
+        db()->commit();
+    } catch (Throwable $ex) {
+        db()->rollBack();
+        flash($ex->getMessage(), 'err');
+        redirect('/admin/pos');
+    }
+    unset($_SESSION['pos_cart'], $_SESSION['pos_customer']);
+    flash('Sale #' . $oid . ' complete — invoice #' . $inv . '. Change due: MWK ' . money($change) . '.');
+    redirect('/invoice/' . $inv);
+}
+
+function walkin_customer_id(): int
+{
+    $row = db_one("SELECT id FROM customers WHERE name = 'Walk-in' ORDER BY id LIMIT 1");
+    if ($row) {
+        return (int) $row['id'];
+    }
+    db_exec("INSERT INTO customers (name, phone) VALUES ('Walk-in','')");
+    return db_last_id();
 }
 
 // ---------- Purchasing ----------
