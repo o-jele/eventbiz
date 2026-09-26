@@ -9,9 +9,11 @@ function db(): PDO
         return $pdo;
     }
     global $config;
+    $port = (int) ($config['db_port'] ?? 3306);
     $dsn = sprintf(
-        'mysql:host=%s;dbname=%s;charset=utf8mb4',
+        'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
         $config['db_host'],
+        $port,
         $config['db_name']
     );
     $pdo = new PDO($dsn, $config['db_user'], $config['db_pass'], [

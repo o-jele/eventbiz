@@ -20,6 +20,27 @@ sudo ./deploy/hestia-setup.sh --user glamorous --domain glamorous.mw \
 Then open `https://glamorous.mw/install.php` → enter DB details → create
 admin → **delete install.php**. Full steps: `docs/hestia-deployment.md`.
 
+## Local development (Windows)
+
+Needs: PHP 8.1+ with `pdo_mysql`, Docker Desktop.
+
+```powershell
+# 1. Database (isolated MariaDB on port 3307)
+docker run -d --name glamorous-db -p 127.0.0.1:3307:3306 `
+  -e MARIADB_ROOT_PASSWORD=GlamDevRoot123 -e MARIADB_DATABASE=glamorous mariadb:10.6
+& 'C:\Program Files\MariaDB 10.6\bin\mysql.exe' -h 127.0.0.1 -P 3307 -u root -pGlamDevRoot123 glamorous -e 'SOURCE public_html/app/database/schema.sql'
+& 'C:\Program Files\MariaDB 10.6\bin\mysql.exe' -h 127.0.0.1 -P 3307 -u root -pGlamDevRoot123 glamorous -e 'SOURCE public_html/app/database/seed.sql'
+
+# 2. Config: copy public_html/config.example.php -> public_html/config.php
+#    (gitignored) and set db_host 127.0.0.1, db_port 3307, creds above.
+
+# 3. Serve + open http://127.0.0.1:8000
+php -S 127.0.0.1:8000 -t public_html dev-router.php
+```
+
+Flow: develop locally → `.\deploy\make-bundle.ps1` → `git push` → `git pull`
+on the server → upload bundle → rerun `hestia-setup.sh` (or panel Files).
+
 ## Layout
 
 ```text
