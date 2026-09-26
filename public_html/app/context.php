@@ -28,7 +28,7 @@ function context_key_for_path(string $path): string
 {
     $p = strtolower(rtrim($path, '/'));
     if ($p === '') {
-        return 'creations'; // homepage neutral; default keeps old links working
+        return 'neutral'; // homepage shows the parent brand, not a subsidiary
     }
     if (preg_match('#^/(creations|shop|products|product|cart|checkout)(/|$)#', $p)) {
         return 'creations';

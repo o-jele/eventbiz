@@ -23,14 +23,14 @@ function pg_home(): void
       <p class="lead">Stock your kitchen at <strong>Glamorous Creations</strong> — or let <strong>Glamorous Delights</strong> handle your wedding, party or corporate event, from cake to catering to chairs.</p>
       <div class="hero-cta">
         <a class="btn" href="/creations/shop">Shop supplies</a>
-        <a class="btn gold" href="/delights/request">Plan an event</a>
+        <a class="btn dark" href="/delights/request">Plan an event</a>
       </div>
     </div>' . $featHtml . '</div></section>
     <div class="hero">
-      <a class="cat-card" href="/creations/shop"><h3>Glamorous Creations</h3>
+      <a class="cat-card" href="/creations/shop"><img class="cat-logo" src="/assets/img/logo-creations.jpg" alt="Glamorous Creations"><h3>Glamorous Creations</h3>
         <p>Flour, flavours, tools &amp; packaging for home bakers and businesses. Order online — pickup or arranged delivery.</p>
         <p><strong>Browse the shop →</strong></p></a>
-      <a class="cat-card" href="/delights"><h3>Glamorous Delights</h3>
+      <a class="cat-card" href="/delights"><img class="cat-logo" src="/assets/img/logo-delights.jpg" alt="Glamorous Delights"><h3>Glamorous Delights</h3>
         <p>Wedding &amp; custom cakes, catering, equipment rental and full event styling. Tell us your date — we send a quotation.</p>
         <p><strong>Explore celebrations →</strong></p></a>
     </div>

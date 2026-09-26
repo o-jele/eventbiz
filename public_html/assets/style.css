@@ -1,32 +1,32 @@
-/* Glamorous — feminine boutique theme.
-   Muted luxury: cream, dusty rose, gold. Serif display + soft sans.
-   Research notes: 60% neutrals, accent on CTAs only, generous whitespace,
-   mobile-first tap targets, fast (no frameworks). */
+/* Glamorous — brand theme from the official logos.
+   Bold black + candy pink on white. Rounded geometric type (Quicksand
+   matches the wordmark). Pink does the talking; black anchors. */
 :root {
-  --cream: #FFF9F4;
-  --blush: #F9E9E3;
-  --blush-deep: #F3D5CC;
-  --rose: #C05B7A;
-  --rose-deep: #A34866;
-  --wine: #5C2E44;
-  --plum: #3E2A35;
+  --cream: #FFF7FA;
+  --blush: #FCE9F2;
+  --blush-deep: #F4C6DA;
+  --rose: #DE7FB8;
+  --rose-deep: #BC568E;
+  --wine: #241A21;
+  --plum: #161216;
   --gold: #C9A24B;
   --gold-soft: #F3E6C8;
-  --ink: #4A3440;
-  --mut: #8E7683;
-  --line: #F0DCD4;
+  --ink: #2B232A;
+  --mut: #8A7584;
+  --line: #F3D3E2;
   --card: #FFFFFF;
   --sage: #7D9B76;
-  --shadow: 0 10px 30px rgba(122, 62, 82, .10);
-  --shadow-sm: 0 4px 14px rgba(122, 62, 82, .08);
+  --shadow: 0 10px 30px rgba(190, 70, 130, .12);
+  --shadow-sm: 0 4px 14px rgba(190, 70, 130, .08);
   --r-lg: 20px;
   --r-md: 14px;
   --r-pill: 999px;
-  --font-display: "Playfair Display", "Didot", Georgia, serif;
+  --font-display: "Quicksand", "Nunito", system-ui, sans-serif;
   --font-body: "Quicksand", "Nunito", system-ui, -apple-system, sans-serif;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+::selection { background: var(--rose); color: #fff; }
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -36,7 +36,7 @@ body {
   background: var(--cream);
   -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.2; color: var(--wine); margin: 0 0 .6rem; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; line-height: 1.2; color: var(--wine); margin: 0 0 .6rem; letter-spacing: -.01em; }
 h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
 h2 { font-size: clamp(1.5rem, 3.5vw, 2.1rem); margin-top: 2.2rem; }
 h3 { font-size: 1.25rem; }
@@ -56,11 +56,17 @@ a { color: var(--rose-deep); }
 }
 .brand {
   font-family: var(--font-display);
-  font-size: 1.6rem; font-weight: 700;
+  font-size: 1.5rem; font-weight: 700;
   color: var(--wine); text-decoration: none;
   letter-spacing: .02em;
+  display: inline-flex; align-items: center; gap: .5rem;
 }
-.brand em { color: var(--gold); font-style: normal; }
+.brand em { color: var(--rose); font-style: normal; }
+.brand-logo { height: 46px; width: auto; border-radius: 10px; }
+.cat-logo { height: 74px; width: auto; max-width: 100%; object-fit: contain; margin-bottom: .8rem; mix-blend-mode: multiply; }
+.foot-logos { display: flex; gap: .8rem; margin-bottom: 1rem; }
+.foot-logos span { background: #fff; border-radius: 14px; padding: .45rem .7rem; display: inline-flex; }
+.foot-logos img { height: 44px; width: auto; display: block; }
 .topbar nav { display: flex; gap: 1rem; flex-wrap: wrap; margin-left: auto; align-items: center; }
 .topbar nav a { color: var(--ink); text-decoration: none; font-weight: 600; font-size: .95rem; padding: .35rem .1rem; }
 .topbar nav a:hover { color: var(--rose-deep); }
@@ -84,7 +90,7 @@ a { color: var(--rose-deep); }
 /* ---------- hero ---------- */
 .hero-band {
   position: relative; overflow: hidden;
-  background: linear-gradient(135deg, var(--blush) 0%, #FDEFE8 55%, var(--gold-soft) 130%);
+  background: linear-gradient(135deg, var(--blush) 0%, #FDEEF5 55%, #F9D8E8 130%);
   border: 1px solid var(--line);
   border-radius: 28px;
   padding: clamp(2rem, 6vw, 4rem) clamp(1.4rem, 5vw, 3.5rem);
@@ -93,7 +99,7 @@ a { color: var(--rose-deep); }
 }
 .hero-band::after {
   content: ""; position: absolute; right: -70px; top: -70px; width: 220px; height: 220px;
-  background: radial-gradient(circle, rgba(201,162,75,.22), transparent 70%);
+  background: radial-gradient(circle, rgba(222,127,184,.28), transparent 70%);
   border-radius: 50%; pointer-events: none;
 }
 .hero-grid { display: grid; grid-template-columns: 7fr 5fr; gap: 2rem; align-items: center; position: relative; z-index: 1; }
@@ -127,14 +133,14 @@ a { color: var(--rose-deep); }
   background: linear-gradient(135deg, var(--rose), var(--rose-deep));
   color: #fff; font-family: var(--font-body); font-weight: 700; font-size: 1rem;
   padding: .7rem 1.6rem; border-radius: var(--r-pill);
-  box-shadow: 0 6px 18px rgba(192, 91, 122, .35);
+  box-shadow: 0 6px 18px rgba(222, 127, 184, .45);
   transition: transform .15s ease, box-shadow .15s ease;
   min-height: 48px;
 }
-.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(192, 91, 122, .4); color: #fff; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(222, 127, 184, .5); color: #fff; }
 .btn.sec { background: #fff; color: var(--wine); border: 1.5px solid var(--blush-deep); box-shadow: none; }
 .btn.sec:hover { border-color: var(--rose); color: var(--rose-deep); box-shadow: var(--shadow-sm); }
-.btn.gold { background: linear-gradient(135deg, #D4AF5E, var(--gold)); box-shadow: 0 6px 18px rgba(201,162,75,.35); }
+.btn.dark { background: linear-gradient(135deg, #2B232A, #141114); box-shadow: 0 6px 18px rgba(20, 17, 22, .35); }
 button.btn { font-size: .92rem; padding: .55rem 1.2rem; min-height: 44px; }
 
 /* ---------- cards & grids ---------- */
@@ -174,7 +180,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 
 /* ---------- pills, badges, stock ---------- */
 .badge { display: inline-block; font-size: .75rem; font-weight: 700; letter-spacing: .06em; padding: .18rem .7rem; border-radius: var(--r-pill); color: #fff; text-transform: uppercase; }
-.badge-gc { background: var(--sage); }
+.badge-gc { background: #1A1A1A; }
 .badge-gd { background: var(--rose); }
 .stock-pill { display: inline-block; font-size: .85rem; font-weight: 700; border-radius: var(--r-pill); padding: .25rem .9rem; }
 .stock-ok { background: #E7F2E4; color: #3E7A44; }

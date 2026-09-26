@@ -11,6 +11,15 @@ function layout(string $title, string $body, string $active = ''): void
     $u = current_user();
     $flash = take_flash();
     $isStaff = $u && in_array($u['role'], STAFF_ROLES, true);
+    // Brand mark follows the business context: each subsidiary shows its own logo.
+    $brandPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    $brandCtx = function_exists('context_key_for_path') ? context_key_for_path($brandPath) : 'neutral';
+    $brandHtml = '<a class="brand" href="/">Glamorous<em>.</em></a>';
+    if ($brandCtx === 'creations') {
+        $brandHtml = '<a class="brand" href="/creations"><img class="brand-logo" src="/assets/img/logo-creations.jpg" alt="Glamorous Creations"></a>';
+    } elseif ($brandCtx === 'delights') {
+        $brandHtml = '<a class="brand" href="/delights"><img class="brand-logo" src="/assets/img/logo-delights.jpg" alt="Glamorous Delights"></a>';
+    }
     ?>
 <!doctype html>
 <html lang="en">
@@ -21,12 +30,12 @@ function layout(string $title, string $body, string $active = ''): void
 <title><?= e($title) ?> · Glamorous</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="/">Glamorous<em>.</em></a>
+  <?= $brandHtml ?>
   <nav>
     <a href="/creations/shop">Shop</a>
     <a href="/delights/cakes">Cakes</a>
@@ -55,7 +64,8 @@ function layout(string $title, string $body, string $active = ''): void
 <footer class="foot">
   <div class="foot-inner">
     <div>
-      <h4>Glamorous<em style="color:var(--gold)">.</em></h4>
+      <div class="foot-logos"><span><img src="/assets/img/logo-creations.jpg" alt="Glamorous Creations"></span><span><img src="/assets/img/logo-delights.jpg" alt="Glamorous Delights"></span></div>
+      <h4>Glamorous<em style="color:var(--rose)">.</em></h4>
       <p>Baking supplies, custom cakes, catering, rentals &amp; full events — made with love in Lilongwe, Malawi.</p>
     </div>
     <div>
