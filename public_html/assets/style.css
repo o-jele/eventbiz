@@ -53,6 +53,7 @@ a { color: var(--rose-deep); }
   background: rgba(255, 249, 244, .92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(190, 70, 130, .08);
 }
 .brand {
   font-family: var(--font-display);
