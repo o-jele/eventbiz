@@ -341,10 +341,12 @@ function pg_admin(): void
         . '<div class="greet-row"><div>'
         . '<h1>' . $greet . ', <span class="grad-text">' . e($u['name']) . '</span></h1>'
         . '<p class="mut" style="margin:0">' . date('l, j F Y') . ' · here is your business at a glance.</p></div></div>'
+        . '<p class="section-label">Shortcuts</p>'
         . '<div class="quick-actions"><a class="btn sec" href="/admin/pos">Creations</a>'
         . '<a class="btn sec" href="/admin/bakery">Bakery</a>'
         . '<a class="btn sec" href="/admin/catering">Catering</a>'
         . '<a class="btn sec" href="/admin/rentals">Rentals</a></div>'
+        . '<p class="section-label">At a glance</p>'
         . '<div class="stats">'
         . $tile((string) $open, 'open enquiries', '/admin/enquiries',
             trend_badge(trend_of((float) $enq7, (float) ($ePrev['n'] ?? 0))), $open > 0, (float) $open, 0, '')

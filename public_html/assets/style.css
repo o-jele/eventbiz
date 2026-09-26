@@ -306,6 +306,8 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .stat .row { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
 .quick-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin: 0 0 1.2rem; }
 .quick-actions .btn { text-align: center; }
+.section-label { font-size: .75rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mut); margin: 1.4rem 0 .6rem; }
+.section-label:first-child { margin-top: 0; }
 @media (max-width: 700px) { .quick-actions { grid-template-columns: repeat(2, 1fr); } }
 .chart-card { padding: 1.2rem 1.3rem; }
 .chart-meta { display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: baseline; margin-bottom: .6rem; }
@@ -371,6 +373,7 @@ a.cal-cell i { position: absolute; top: .15rem; right: .3rem; font-style: normal
 [data-theme="dark"] #pos-suggest button { background: var(--card); color: var(--ink); }
 [data-theme="dark"] .btn.sec, [data-theme="dark"] .chips a, [data-theme="dark"] .tabs a,
 [data-theme="dark"] .theme-btn { background: #2A1F30; color: var(--ink); }
+[data-theme="dark"] .profile-btn { background: #2A1F30; color: var(--ink); border-color: #4A3449; }
 [data-theme="dark"] .cal-day b { color: var(--ink); }
 [data-theme="dark"] .cal-day.has { background: #3A2436; }
 [data-theme="dark"] .hero-band { background: linear-gradient(135deg, #2A1B2C, #241826); }
